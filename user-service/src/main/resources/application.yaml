@@ -5,16 +5,57 @@ spring:
   application:
     name: user-service
 
-eureka:
-  client:
-    service-url:
-      defaultZone: http://localhost:8761/eureka
+  # H2 Database (local dev only)
+  h2:
+    console:
+      enabled: true
+      path: /h2-console
+
+  datasource:
+    url: jdbc:h2:mem:userdb      # In-memory H2
+    driver-class-name: org.h2.Driver
+    username: sa
+    password:
+
+  jpa:
+    database-platform: org.hibernate.dialect.H2Dialect
+    hibernate:
+      ddl-auto: update #create-drop     # Creates tables from @Entity
+    show-sql: true              # See SQL in logs
+    properties:
+      hibernate:
+        format_sql: true
+
+  sql:
+    init:
+      mode: always
+
+  # Enable Spring Security DEBUG (shows filter chain execution)
+  security:
+    debug: true  # CRITICAL - shows exact filter execution order
+
+
+#eureka:
+#  client:
+#    service-url:
+#      defaultZone: http://localhost:8761/eureka
 
 management:
   endpoints:
     web:
       exposure:
-        include: health, info
+        include: health, info, metrics
   endpoint:
     health:
       show-details: always
+
+
+# Enable DEBUG logging for critical Spring Security components
+logging:
+  level:
+    com.crowdsource.userservice.security: DEBUG  # Your JWT filter & CustomUserDetails
+    org.springframework.security: DEBUG          # Full SecurityContext flow
+    org.springframework.security.web: DEBUG      # Filter chain
+    org.springframework.security.web.FilterChainProxy: DEBUG
+    root: INFO  # Keep everything else INFO
+
