@@ -1,6 +1,11 @@
 server:
   port: 8001
 
+# JWT Secret (externalized)
+app:
+  jwt:
+    secret: "dec586f36393fbd369b549108c317920235a875bbfa555272ffeb31ddcf33cec"
+
 spring:
   application:
     name: api-gateway
@@ -16,32 +21,39 @@ spring:
         - id: user-service
           uri: lb://USER-SERVICE
           predicates:
-            - Path=/api/v1/user/**
+            - Path=/user/**
+          filters:
+            - StripPrefix=1
 
         - id: event-service
           uri: lb://EVENT-SERVICE
           predicates:
             - Path=/api/v1/event/**
-#          filters:
-#            - StripPrefix=2            # Removes /api/v1 from forwarded path
+          filters:
+            - name: JwtAuthenticationFilter
 
 eureka:
   client:
     service-url:
       defaultZone: http://localhost:8761/eureka
+    fetch-registry: true
+    register-with-eureka: true
 
 management:
   endpoints:
     web:
       exposure:
-        include: health, info
+        include: health, info, gateway, routes
   endpoint:
     health:
       show-details: always
 
 logging:
   level:
-    org.springframework.cloud.gateway: INFO    # Errors + metrics only (Production)
-    org.springframework.cloud.gateway.route.RouteDefinitionRouteLocator: DEBUG     # Route loading
-    org.springframework.cloud.gateway.handler.RoutePredicateHandlerMapping: DEBUG  # Path matching
-    org.springframework.cloud.gateway.filter.NettyRoutingFilter: DEBUG           # Backend forwarding
+    com.crowdsource.apigateway: DEBUG
+    org.springframework.cloud.gateway: DEBUG
+    reactor.netty: DEBUG
+#    org.springframework.cloud.gateway.route.RouteDefinitionRouteLocator: DEBUG     # Route loading
+#    org.springframework.cloud.gateway.handler.RoutePredicateHandlerMapping: DEBUG  # Path matching
+#    org.springframework.cloud.gateway.filter.NettyRoutingFilter: DEBUG           # Backend forwarding
+#    org.springframework.cloud.gateway: INFO    # Errors + metrics only (Production)

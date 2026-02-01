@@ -4,6 +4,7 @@ import com.crowdsource.userservice.dto.AuthResponse;
 import io.jsonwebtoken.Claims;
 import io.jsonwebtoken.Jwts;
 import io.jsonwebtoken.security.Keys;
+import org.springframework.beans.factory.annotation.Value;
 import org.springframework.security.core.userdetails.UserDetails;
 import org.springframework.stereotype.Component;
 
@@ -14,7 +15,14 @@ import java.util.function.Function;
 
 @Component
 public class JwtUtil {
-    private static final String SECRET = "dec586f36393fbd369b549108c317920235a875bbfa555272ffeb31ddcf33cec";
+
+    private final SecretKey secretKey;
+
+    public JwtUtil(@Value("${app.jwt.secret}") String secret) {
+        byte[] keyBytes = secret.getBytes(StandardCharsets.UTF_8);
+        this.secretKey = Keys.hmacShaKeyFor(keyBytes);
+    }
+
     private static final long ACCESS_TOKEN_EXPIRY = 15 * 60 * 1000; // 15 mins
     private static final long REFRESH_TOKEN_EXPIRY = 7 * 24 * 60 * 60 * 1000; // 7 days
 
@@ -24,7 +32,7 @@ public class JwtUtil {
                 .issuedAt(new Date())
                 .expiration(new Date(System.currentTimeMillis() + ACCESS_TOKEN_EXPIRY))
                 .claim("roles", userDetails.getAuthorities())
-                .signWith(getSigningKey())
+                .signWith(secretKey)
                 .compact();
     }
 
@@ -33,7 +41,7 @@ public class JwtUtil {
                 .subject(userDetails.getUsername())
                 .issuedAt(new Date())
                 .expiration(new Date(System.currentTimeMillis() + REFRESH_TOKEN_EXPIRY))
-                .signWith(getSigningKey())
+                .signWith(secretKey)
                 .compact();
     }
 
@@ -61,15 +69,10 @@ public class JwtUtil {
 
     public Claims extractAllClaims(String token) {
         return Jwts.parser()
-                .verifyWith(getSigningKey())
+                .verifyWith(secretKey)
                 .build()
                 .parseSignedClaims(token)
                 .getPayload();
-    }
-
-    private SecretKey getSigningKey() {
-        byte[] keyBytes = SECRET.getBytes(StandardCharsets.UTF_8);
-        return Keys.hmacShaKeyFor(keyBytes);
     }
 
     public AuthResponse buildAuthResponse(String accessToken, String refreshToken) {
@@ -85,7 +88,7 @@ public class JwtUtil {
     public boolean validateToken(String token) {
         try {
             Jwts.parser()
-                    .verifyWith(getSigningKey())
+                    .verifyWith(secretKey)
                     .build()
                     .parseSignedClaims(token);
             return true;

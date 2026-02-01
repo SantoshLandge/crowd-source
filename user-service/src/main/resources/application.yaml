@@ -1,6 +1,11 @@
 server:
   port: 8002
 
+# JWT Secret (externalized)
+app:
+  jwt:
+    secret: "dec586f36393fbd369b549108c317920235a875bbfa555272ffeb31ddcf33cec"
+
 spring:
   application:
     name: user-service
@@ -35,10 +40,10 @@ spring:
     debug: true  # CRITICAL - shows exact filter execution order
 
 
-#eureka:
-#  client:
-#    service-url:
-#      defaultZone: http://localhost:8761/eureka
+eureka:
+  client:
+    service-url:
+      defaultZone: http://localhost:8761/eureka
 
 management:
   endpoints:
