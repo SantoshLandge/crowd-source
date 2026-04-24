@@ -1,21 +1,29 @@
 package com.crowdsource.userservice.util;
 
 import com.crowdsource.userservice.dto.AuthResponse;
+import com.crowdsource.userservice.security.CustomUserDetails;
 import io.jsonwebtoken.Claims;
 import io.jsonwebtoken.Jwts;
 import io.jsonwebtoken.security.Keys;
+import lombok.extern.slf4j.Slf4j;
 import org.springframework.beans.factory.annotation.Value;
+import org.springframework.security.core.GrantedAuthority;
 import org.springframework.security.core.userdetails.UserDetails;
 import org.springframework.stereotype.Component;
 
 import javax.crypto.SecretKey;
 import java.nio.charset.StandardCharsets;
+import java.util.Collection;
 import java.util.Date;
+import java.util.List;
 import java.util.function.Function;
 
+@Slf4j
 @Component
 public class JwtUtil {
 
+    private static final long ACCESS_TOKEN_EXPIRY = 15 * 60 * 1000; // 15 mins
+    private static final long REFRESH_TOKEN_EXPIRY = 7 * 24 * 60 * 60 * 1000; // 7 days
     private final SecretKey secretKey;
 
     public JwtUtil(@Value("${app.jwt.secret}") String secret) {
@@ -23,18 +31,28 @@ public class JwtUtil {
         this.secretKey = Keys.hmacShaKeyFor(keyBytes);
     }
 
-    private static final long ACCESS_TOKEN_EXPIRY = 15 * 60 * 1000; // 15 mins
-    private static final long REFRESH_TOKEN_EXPIRY = 7 * 24 * 60 * 60 * 1000; // 7 days
-
-    public String generateAccessToken(UserDetails userDetails) {
+    public String generateAccessToken(CustomUserDetails userDetails) {  // Use CustomUserDetails
         return Jwts.builder()
-                .subject(userDetails.getUsername())
+                .subject(userDetails.getUsername())  // email
+                .claim("userId", userDetails.getUserId())
+                .claim("roles", extractRoles(userDetails.getAuthorities()))  // SPLIT: roles only
+                .claim("authorities", userDetails.getAuthorities().stream()
+                        .map(GrantedAuthority::getAuthority).toList())  // ADD: full permissions
                 .issuedAt(new Date())
                 .expiration(new Date(System.currentTimeMillis() + ACCESS_TOKEN_EXPIRY))
-                .claim("roles", userDetails.getAuthorities())
                 .signWith(secretKey)
                 .compact();
     }
+
+    // Extract roles with "ROLE_" prefix
+    public List<String> extractRoles(Collection<? extends GrantedAuthority> authorities) {
+        return authorities.stream()
+                .map(GrantedAuthority::getAuthority)
+                .filter(auth -> auth.startsWith("ROLE_"))
+                .map(auth -> auth.substring(5))  // "ROLE_ADMIN" → "ADMIN"
+                .toList();
+    }
+
 
     public String generateRefreshToken(UserDetails userDetails) {
         return Jwts.builder()
@@ -68,20 +86,24 @@ public class JwtUtil {
     }
 
     public Claims extractAllClaims(String token) {
-        return Jwts.parser()
-                .verifyWith(secretKey)
-                .build()
-                .parseSignedClaims(token)
-                .getPayload();
+        try {
+            return Jwts.parser()
+                    .verifyWith(secretKey)
+                    .build()
+                    .parseSignedClaims(token)
+                    .getPayload();
+        } catch (Exception e) {
+            throw new IllegalArgumentException("Invalid JWT token", e);
+        }
     }
 
     public AuthResponse buildAuthResponse(String accessToken, String refreshToken) {
         return AuthResponse.builder()
                 .accessToken(accessToken)
                 .tokenType("Bearer")
-                .expiresIn(ACCESS_TOKEN_EXPIRY)
+                .expiresIn(ACCESS_TOKEN_EXPIRY / 1000)
                 .refreshToken(refreshToken)
-                .refreshExpiresIn(REFRESH_TOKEN_EXPIRY)
+                .refreshExpiresIn(REFRESH_TOKEN_EXPIRY / 1000)
                 .build();
     }
 
@@ -90,9 +112,10 @@ public class JwtUtil {
             Jwts.parser()
                     .verifyWith(secretKey)
                     .build()
-                    .parseSignedClaims(token);
+                    .parseSignedClaims(token);  // Validates exp + signature
             return true;
         } catch (Exception e) {
+            log.debug("Invalid token: {}", e.getMessage());
             return false;
         }
     }

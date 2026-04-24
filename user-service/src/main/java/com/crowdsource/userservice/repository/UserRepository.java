@@ -9,9 +9,10 @@ import java.util.Optional;
 @Repository
 public interface UserRepository extends JpaRepository<User, Long> {
 
+    // Core auth lookup (email as username)
     Optional<User> findByEmail(String email);
-    Optional<User> findByUsername(String username);
+
+    // Check if user exists for registration
     boolean existsByEmail(String email);
-    boolean existsByUsername(String username);
 
 }
