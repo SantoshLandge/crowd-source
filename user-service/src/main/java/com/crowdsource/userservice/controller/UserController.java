@@ -36,115 +36,40 @@ import java.util.concurrent.ThreadLocalRandom;
 public class UserController {
 
     private final UserService userService;
-    private final JwtUtil jwtUtil;
-    private final RefreshTokenRepository refreshTokenRepo;
-    private final CustomUserDetailsService customUserDetailsService;
-    private final AuthenticationManager authenticationManager;
 
     @PostMapping("/signup")
-    public ResponseEntity<AuthResponse> signup(@Valid @RequestBody SignupRequest request) throws DuplicateEntityException {
+    public ResponseEntity<AuthResponse> signup(@Valid @RequestBody SignupRequest request) {
         log.info("Signup attempt for: {}", request.getUsername());
         return ResponseEntity.ok(userService.signup(request));
     }
 
     @GetMapping("/me")
     public ResponseEntity<UserResponse> getCurrentUser() {
-
-        Authentication auth = SecurityContextHolder.getContext().getAuthentication();
-        CustomUserDetails userDetails = (CustomUserDetails) auth.getPrincipal();
-
-        return ResponseEntity.ok(UserResponse.builder()
-                .username(userDetails.getUsername())
-                .email(userDetails.getUsername())
-                .roles(jwtUtil.extractRoles(userDetails.getAuthorities()))
-                .build());
+        log.info("User profile request");
+        return ResponseEntity.ok(userService.getCurrentUser());
     }
 
     @PostMapping("/login")
     public ResponseEntity<?> login(@Valid @RequestBody LoginRequest request) {
         log.info("Login attempt for: {}", request.getUsername());
-        Authentication auth = authenticationManager.authenticate(
-                new UsernamePasswordAuthenticationToken(request.getUsername(), request.getPassword())
-        );
-        CustomUserDetails userDetails = (CustomUserDetails) auth.getPrincipal();
-        String accessToken = jwtUtil.generateAccessToken(userDetails);
-
-        String refreshTokenRaw = generateNewRefreshToken(userDetails.getUserId());
-
-        AuthResponse response = jwtUtil.buildAuthResponse(accessToken, refreshTokenRaw);
-        return ResponseEntity.ok(response);
+        return ResponseEntity.ok(userService.login(request));
     }
 
     @PostMapping("/refresh")
-    public ResponseEntity<AuthResponse> refresh(HttpServletRequest request) throws InvalidRefreshTokenException {
-        String refreshToken = extractRefreshToken(request);
-        log.info("Refresh token request: {}", refreshToken);
-
-        RefreshToken token = refreshTokenRepo.findByTokenHash(RefreshToken.hash(refreshToken))
-                .filter(RefreshToken::isValid)
-                .orElseThrow(() -> new InvalidRefreshTokenException("Invalid refresh token"));
-
-        CustomUserDetails userDetails = customUserDetailsService.loadUserByUserId(token.getUserId());
-        String newAccessToken = jwtUtil.generateAccessToken(userDetails);
-
-        // Rotate refresh token (security best practice)
-        revokeToken(token);
-        String refreshTokenRaw = generateNewRefreshToken(token.getUserId());
-
-        return ResponseEntity.ok(jwtUtil.buildAuthResponse(newAccessToken, refreshTokenRaw));
-    }
-
-    private void revokeToken(RefreshToken token) {
-        token.setRevoked(true);
-        refreshTokenRepo.save(token);
-    }
-
-    // Generate + persist new Opaque random string refresh token (NOT JWT)
-    public String generateNewRefreshToken(Long userId) {
-        String rawToken = UUID.randomUUID() + "-" +
-                System.currentTimeMillis() + "-" +
-                ThreadLocalRandom.current().nextInt(1000, 9999);
-
-        RefreshToken newToken = RefreshToken.create(rawToken, userId, Duration.ofDays(7));
-        refreshTokenRepo.save(newToken);
-
-        return rawToken;
-    }
-
-    private String extractRefreshToken(HttpServletRequest request) {
-        // Priority: cookie > header
-        String token = request.getHeader("X-Refresh-Token");
-        if (token == null) {
-            Cookie[] cookies = request.getCookies();
-            if (cookies != null) {
-                for (Cookie cookie : cookies) {
-                    if ("refreshToken".equals(cookie.getName())) {
-                        token = cookie.getValue();
-                    }
-                }
-            }
-        }
-        return token;
+    public ResponseEntity<AuthResponse> refresh(HttpServletRequest request) {
+        return ResponseEntity.ok(userService.refresh(request));
     }
 
     @PostMapping("/logout-all")
-    @PreAuthorize("isAuthenticated()")
     public ResponseEntity<?> logoutAllDevices(Authentication auth) {
-        Long userId = ((CustomUserDetails) auth.getPrincipal()).getUserId();
-        refreshTokenRepo.deleteByUserId(userId);
+        log.info("Logout all devices");
+        userService.logoutAllDevices(auth);
         return ResponseEntity.ok().build();
     }
 
     @PostMapping("/logout")
-    public ResponseEntity<?> logout(HttpServletRequest request) throws InvalidRefreshTokenException {
-        String refreshToken = extractRefreshToken(request);
-        log.info("Logout request refresh token: {}", refreshToken);
-        RefreshToken token = refreshTokenRepo.findByTokenHash(RefreshToken.hash(refreshToken))
-                .orElseThrow(() -> new InvalidRefreshTokenException("Invalid refresh token"));
-
-        token.setRevoked(true);
-        refreshTokenRepo.save(token);
-
+    public ResponseEntity<?> logout(HttpServletRequest request) {
+        userService.logout(request);
         return ResponseEntity.ok().build();
     }
 
