@@ -1,36 +1,49 @@
 server:
   port: 8001
 
-# JWT Secret (externalized)
-app:
-  jwt:
-    secret: "dec586f36393fbd369b549108c317920235a875bbfa555272ffeb31ddcf33cec"
-
 spring:
   application:
     name: api-gateway
 
   cloud:
     gateway:
-      discovery:
-        locator:
-          enabled: true
-          lower-case-service-id: true
+      server:
+        webflux:
+          discovery:
+            locator:
+              enabled: true
+              lower-case-service-id: true
+          routes:
+            - id: user-service
+              uri: lb://USER-SERVICE
+              predicates:
+                - Path=/user/**
+              filters:
+                - StripPrefix=1
+#                - RewritePath=/api/users/?(?<remaining>.*), /v1/users/${remaining}
 
-      routes:
-        - id: user-service
-          uri: lb://USER-SERVICE
-          predicates:
-            - Path=/user/**
-          filters:
-            - StripPrefix=1
+            - id: event-service
+              uri: lb://EVENT-SERVICE
+              predicates:
+                - Path=/api/v1/event/**
+              filters:
+                - StripPrefix=1
+#                - RewritePath=/api/v1/event/?(?<remaining>.*), /v1/event/${remaining}
 
-        - id: event-service
-          uri: lb://EVENT-SERVICE
-          predicates:
-            - Path=/api/v1/event/**
-          filters:
-            - name: JwtAuthenticationFilter
+            - id: registration-service
+              uri: lb://REGISTRATION-SERVICE
+              predicates:
+                - Path=/api/v1/registration/**
+              filters:
+                - StripPrefix=1
+#                - RewritePath=/api/v1/registration/?(?<remaining>.*), /v1/registration/${remaining}
+
+  security:
+    oauth2:
+      resourceserver:
+        jwt:
+          jwk-set-uri: http://localhost:8002/.well-known/jwks.json
+          jws-algorithms: ES256
 
 eureka:
   client:
@@ -51,7 +64,8 @@ management:
 logging:
   level:
     com.crowdsource.apigateway: DEBUG
-    org.springframework.cloud.gateway: DEBUG
+    org.springframework.security: DEBUG
+    org.springframework.cloud.gateway: INFO
     reactor.netty: DEBUG
 #    org.springframework.cloud.gateway.route.RouteDefinitionRouteLocator: DEBUG     # Route loading
 #    org.springframework.cloud.gateway.handler.RoutePredicateHandlerMapping: DEBUG  # Path matching
