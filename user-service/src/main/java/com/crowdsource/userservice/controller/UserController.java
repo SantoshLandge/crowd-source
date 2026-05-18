@@ -4,30 +4,15 @@ import com.crowdsource.userservice.dto.AuthResponse;
 import com.crowdsource.userservice.dto.LoginRequest;
 import com.crowdsource.userservice.dto.SignupRequest;
 import com.crowdsource.userservice.dto.UserResponse;
-import com.crowdsource.userservice.entity.RefreshToken;
-import com.crowdsource.userservice.exception.DuplicateEntityException;
-import com.crowdsource.userservice.exception.InvalidRefreshTokenException;
-import com.crowdsource.userservice.repository.RefreshTokenRepository;
-import com.crowdsource.userservice.security.CustomUserDetails;
-import com.crowdsource.userservice.service.CustomUserDetailsService;
 import com.crowdsource.userservice.service.UserService;
-import com.crowdsource.userservice.util.JwtUtil;
-import jakarta.servlet.http.Cookie;
 import jakarta.servlet.http.HttpServletRequest;
 import jakarta.validation.Valid;
 import lombok.RequiredArgsConstructor;
 import lombok.extern.slf4j.Slf4j;
 import org.springframework.http.ResponseEntity;
-import org.springframework.security.access.prepost.PreAuthorize;
-import org.springframework.security.authentication.AuthenticationManager;
-import org.springframework.security.authentication.UsernamePasswordAuthenticationToken;
 import org.springframework.security.core.Authentication;
 import org.springframework.security.core.context.SecurityContextHolder;
 import org.springframework.web.bind.annotation.*;
-
-import java.time.Duration;
-import java.util.UUID;
-import java.util.concurrent.ThreadLocalRandom;
 
 @Slf4j
 @RestController

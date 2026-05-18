@@ -18,7 +18,7 @@
         </insert>
         <insert tableName="roles">
             <column name="id" valueNumeric="3"/>
-            <column name="name" value="MODERATOR"/>
+            <column name="name" value="ORGANIZER"/>
         </insert>
     </changeSet>
 

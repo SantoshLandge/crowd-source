@@ -29,7 +29,7 @@ public class WebSecurityConfig {
                         .sessionCreationPolicy(SessionCreationPolicy.STATELESS)
                 )
                 .authorizeHttpRequests(auth -> auth
-                        .requestMatchers("/api/auth/login", "/api/auth/signup", "/api/auth/refresh", "/h2-console/**").permitAll()
+                        .requestMatchers("/api/auth/login", "/api/auth/signup", "/api/auth/refresh", "/h2-console/**", "/.well-known/jwks.json").permitAll()
                         .requestMatchers(HttpMethod.OPTIONS, "/**").permitAll()         // CORS preflight
                         .anyRequest().authenticated()
                 )

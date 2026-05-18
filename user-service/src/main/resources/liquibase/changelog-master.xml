@@ -7,6 +7,6 @@
     <include file="/liquibase/changelog/001-core-tables.xml"/>
     <include file="/liquibase/changelog/002-permissions.xml"/>
     <include file="/liquibase/changelog/003-refresh-tokens.xml"/>
-    <include file="/liquibase/changelog/004-seed-data.xml"/>
+    <include file="/liquibase/changelog/004-insert-data.xml"/>
 
 </databaseChangeLog>
