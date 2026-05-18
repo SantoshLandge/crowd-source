@@ -1,49 +1,28 @@
 package com.crowdsource.eventservice.entity;
 
-import com.crowdsource.eventservice.entity.type.EventStatus;
-import com.crowdsource.eventservice.entity.type.EventType;
 import jakarta.persistence.*;
-import lombok.AllArgsConstructor;
-import lombok.Builder;
 import lombok.Data;
-import lombok.NoArgsConstructor;
-import org.hibernate.annotations.CreationTimestamp;
 
 import java.time.LocalDateTime;
+import java.util.UUID;
 
 @Entity
-@Table(name = "events")
 @Data
-@NoArgsConstructor
-@AllArgsConstructor
-@Builder
+@Table(name = "events")
 public class Event {
     @Id
     @GeneratedValue(strategy = GenerationType.IDENTITY)
     private Long id;
 
-    @Column(nullable = false)
-    private String title;
+    @Column(unique = true)
+    private String name;
 
-    @Column(columnDefinition = "TEXT")
     private String description;
+    private Integer totalCapacity;
+    private Integer availableCapacity;
+    private LocalDateTime eventDate;
+    private String status;
 
-    @Enumerated(EnumType.STRING)
-    private EventType type;  // VIRTUAL/PHYSICAL
-
-    private String venue;  // Physical addr or virtual URL
-
-    private Integer capacity;
-
-    @Enumerated(EnumType.STRING)
-    private EventStatus status = EventStatus.DRAFT;  // DRAFT/PENDING/LIVE/CANCELLED
-
-    private LocalDateTime startAt;
-    private LocalDateTime endAt;
-
-    @Column(name = "organizer_id")  // FK ref User.id (no @ManyToOne for decoupling)
-    private Long organizerId;
-
-    @CreationTimestamp
-    private LocalDateTime createdAt;
+    @Version
+    private Integer version;
 }
