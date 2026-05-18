@@ -1,0 +1,33 @@
+server:
+  port: 8082  # Distinct from user-service
+
+spring:
+  datasource:
+    url: jdbc:postgresql://localhost:5433/eventdb  # Docker: postgres-event
+    username: postgres
+    password: pwd
+    driver-class-name: org.postgresql.Driver
+  jpa:
+    hibernate:
+      ddl-auto: validate
+    show-sql: true
+  kafka:
+    bootstrap-servers: localhost:9092
+    producer:
+      key-serializer: org.apache.kafka.common.serialization.StringSerializer
+      value-serializer: org.springframework.kafka.support.serializer.JsonSerializer
+    consumer:
+      group-id: event-group
+      auto-offset-reset: earliest
+      key-deserializer: org.apache.kafka.common.serialization.StringDeserializer
+      value-deserializer: org.springframework.kafka.support.serializer.JsonDeserializer
+      properties:
+        spring.json.trusted.packages: com.crowdsource.eventservice.dto.*
+
+jwt:
+  secret: "your-super-secret-key-64chars-min-base64-like-this!!!"  # Match User Service
+
+logging:
+  level:
+    com.crowdsource: DEBUG
+    org.springframework.kafka: INFO
