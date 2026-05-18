@@ -1,0 +1,36 @@
+<?xml version="1.0" encoding="UTF-8" standalone="no"?>
+<databaseChangeLog
+        xmlns:xsi="http://www.w3.org/2001/XMLSchema-instance"
+        xmlns="http://www.liquibase.org/xml/ns/dbchangelog"
+        xsi:schemaLocation="http://www.liquibase.org/xml/ns/dbchangelog
+                        https://www.liquibase.org/xml/ns/dbchangelog/dbchangelog-4.29.xsd">
+
+    <!-- PERMISSIONS -->
+    <changeSet id="002-permissions-table" author="santosh">
+        <createTable tableName="permissions">
+            <column name="id" type="BIGSERIAL">
+                <constraints primaryKey="true" primaryKeyName="pk_permissions"/>
+            </column>
+            <column name="name" type="VARCHAR(100)">
+                <constraints nullable="false" unique="true"/>
+            </column>
+            <column name="resource" type="VARCHAR(50)"/>
+            <column name="action" type="VARCHAR(50)"/>
+        </createTable>
+    </changeSet>
+
+    <!-- ROLE_PERMISSIONS Junction -->
+    <changeSet id="002-role-permissions-junction" author="santosh">
+        <createTable tableName="role_permissions">
+            <column name="role_id" type="BIGINT">
+                <constraints nullable="false" foreignKeyName="fk_role_perm_role" references="roles(id)"/>
+            </column>
+            <column name="permission_id" type="BIGINT">
+                <constraints nullable="false" foreignKeyName="fk_role_perm_perm" references="permissions(id)"/>
+            </column>
+        </createTable>
+        <addPrimaryKey tableName="role_permissions" columnNames="role_id,permission_id"
+                       constraintName="pk_role_permissions"/>
+    </changeSet>
+
+</databaseChangeLog>

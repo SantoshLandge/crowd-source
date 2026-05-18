@@ -1,0 +1,110 @@
+<?xml version="1.0" encoding="UTF-8" standalone="no"?>
+<databaseChangeLog
+        xmlns:xsi="http://www.w3.org/2001/XMLSchema-instance"
+        xmlns="http://www.liquibase.org/xml/ns/dbchangelog"
+        xsi:schemaLocation="http://www.liquibase.org/xml/ns/dbchangelog
+                        https://www.liquibase.org/xml/ns/dbchangelog/dbchangelog-4.29.xsd">
+
+
+    <!-- ROLES (Explicit IDs) -->
+    <changeSet id="004-roles" author="santosh">
+        <insert tableName="roles">
+            <column name="id" valueNumeric="1"/>
+            <column name="name" value="USER"/>
+        </insert>
+        <insert tableName="roles">
+            <column name="id" valueNumeric="2"/>
+            <column name="name" value="ADMIN"/>
+        </insert>
+        <insert tableName="roles">
+            <column name="id" valueNumeric="3"/>
+            <column name="name" value="MODERATOR"/>
+        </insert>
+    </changeSet>
+
+    <!-- PERMISSIONS (Explicit IDs) -->
+    <changeSet id="004-permissions" author="santosh">
+        <insert tableName="permissions">
+            <column name="id" valueNumeric="1"/>
+            <column name="name" value="read:profile"/>
+            <column name="resource" value="profile"/>
+            <column name="action" value="read"/>
+        </insert>
+        <insert tableName="permissions">
+            <column name="id" valueNumeric="2"/>
+            <column name="name" value="update:profile"/>
+            <column name="resource" value="profile"/>
+            <column name="action" value="update"/>
+        </insert>
+        <insert tableName="permissions">
+            <column name="id" valueNumeric="3"/>
+            <column name="name" value="read:dashboard"/>
+            <column name="resource" value="dashboard"/>
+            <column name="action" value="read"/>
+        </insert>
+        <insert tableName="permissions">
+            <column name="id" valueNumeric="4"/>
+            <column name="name" value="manage:users"/>
+            <column name="resource" value="users"/>
+            <column name="action" value="manage"/>
+        </insert>
+    </changeSet>
+
+    <!-- ROLE PERMISSIONS -->
+    <changeSet id="004-role-permissions" author="santosh">
+        <!-- ROLE_USER: profile access -->
+        <insert tableName="role_permissions">
+            <column name="role_id" valueNumeric="1"/>
+            <column name="permission_id" valueNumeric="1"/>
+        </insert>
+        <insert tableName="role_permissions">
+            <column name="role_id" valueNumeric="1"/>
+            <column name="permission_id" valueNumeric="2"/>
+        </insert>
+        <!-- ROLE_ADMIN: everything -->
+        <insert tableName="role_permissions">
+            <column name="role_id" valueNumeric="2"/>
+            <column name="permission_id" valueNumeric="1"/>
+        </insert>
+        <insert tableName="role_permissions">
+            <column name="role_id" valueNumeric="2"/>
+            <column name="permission_id" valueNumeric="2"/>
+        </insert>
+        <insert tableName="role_permissions">
+            <column name="role_id" valueNumeric="2"/>
+            <column name="permission_id" valueNumeric="3"/>
+        </insert>
+        <insert tableName="role_permissions">
+            <column name="role_id" valueNumeric="2"/>
+            <column name="permission_id" valueNumeric="4"/>
+        </insert>
+    </changeSet>
+
+    <!-- TEST USERS -->
+    <changeSet id="004-test-users" author="santosh">
+        <!-- Admin (all roles) -->
+        <insert tableName="users">
+            <column name="username" value="admin"/>
+            <column name="email" value="admin@crowdsource.com"/>
+            <column name="password" value="{noop}admin"/>
+            <column name="status" value="ACTIVE"/>
+        </insert>
+        <insert tableName="user_roles">
+            <column name="user_id" valueNumeric="1"/>
+            <column name="role_id" valueNumeric="2"/>
+        </insert>
+
+        <!-- Regular User -->
+        <insert tableName="users">
+            <column name="username" value="user"/>
+            <column name="email" value="user@crowdsource.com"/>
+            <column name="password" value="{noop}user"/>
+            <column name="status" value="ACTIVE"/>
+        </insert>
+        <insert tableName="user_roles">
+            <column name="user_id" valueNumeric="2"/>
+            <column name="role_id" valueNumeric="1"/>
+        </insert>
+    </changeSet>
+
+</databaseChangeLog>
