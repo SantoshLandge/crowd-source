@@ -21,18 +21,22 @@ import jakarta.servlet.http.HttpServletRequest;
 import jakarta.validation.Valid;
 import lombok.RequiredArgsConstructor;
 import lombok.extern.slf4j.Slf4j;
+import org.springframework.http.ResponseEntity;
 import org.springframework.security.authentication.AuthenticationManager;
 import org.springframework.security.authentication.UsernamePasswordAuthenticationToken;
 import org.springframework.security.core.Authentication;
+import org.springframework.security.core.GrantedAuthority;
 import org.springframework.security.core.context.SecurityContextHolder;
 import org.springframework.security.crypto.password.PasswordEncoder;
 import org.springframework.stereotype.Service;
-import org.springframework.transaction.annotation.Transactional;
 
 import java.time.Duration;
+import java.util.List;
+import java.util.Map;
 import java.util.Set;
 import java.util.UUID;
 import java.util.concurrent.ThreadLocalRandom;
+import java.util.stream.Collectors;
 
 @Slf4j
 @Service
@@ -47,7 +51,7 @@ public class UserService {
     private final AuthenticationManager authenticationManager;
     private final JwtUtil jwtUtil;
 
-    public AuthResponse signup(SignupRequest request) {
+    public ResponseEntity<?> signup(SignupRequest request) {
         if (userRepository.existsByEmail(request.getEmail())) {
             throw new DuplicateEntityException("Email already exists");
         }
@@ -58,8 +62,8 @@ public class UserService {
 
         User user = User.builder()
                 .email(request.getEmail())
-                .username(request.getUsername())
                 .password(passwordEncoder.encode(request.getPassword()))
+                .displayName(request.getDisplayName())
                 .roles(Set.of(userRole))
                 .status(UserStatus.ACTIVE)
                 .build();
@@ -71,23 +75,37 @@ public class UserService {
         String accessToken = jwtUtil.generateAccessToken(userDetails);
         String refreshTokenRaw = generateNewRefreshToken(userDetails.getUserId());
 
-        return jwtUtil.buildAuthResponse(accessToken, refreshTokenRaw);
+        // Build the user profile metadata payload
+        AuthResponse userInfo = AuthResponse.builder()
+                .email(userDetails.getUsername())
+                .roles(userDetails.getAuthorities().stream().map(GrantedAuthority::getAuthority).toList())
+                .build();
+
+        return jwtUtil.createAuthResponseWithCookies(accessToken, refreshTokenRaw, userInfo, "Signup successful");
     }
 
     public UserResponse getCurrentUser() {
-
         Authentication auth = SecurityContextHolder.getContext().getAuthentication();
-        CustomUserDetails userDetails = (CustomUserDetails) auth.getPrincipal();
+
+        // 1. Principal is now a String holding the userId from the Gateway header
+        String userId = (String) auth.getPrincipal();
+
+        // 2. Username/Email was passed into the details block, or we can use fallback string parameters
+        String email = auth.getDetails() != null ? auth.getDetails().toString() : "";
+
+        // 3. Extract roles directly out of the authenticated authorities collection
+        List<String> roles = auth.getAuthorities().stream()
+                .map(GrantedAuthority::getAuthority)
+                .collect(Collectors.toList());
 
         return UserResponse.builder()
-                .username(userDetails.getUsername())
-                .email(userDetails.getUsername())
-                .roles(jwtUtil.extractRoles(userDetails.getAuthorities()))
+                .email(email)
+                .roles(roles)
                 .build();
 
     }
 
-    public AuthResponse login(@Valid LoginRequest request) {
+    public ResponseEntity<?> login(@Valid LoginRequest request) {
         Authentication auth = authenticationManager.authenticate(
                 new UsernamePasswordAuthenticationToken(request.getUsername(), request.getPassword())
         );
@@ -96,10 +114,16 @@ public class UserService {
 
         String refreshTokenRaw = generateNewRefreshToken(userDetails.getUserId());
 
-        return jwtUtil.buildAuthResponse(accessToken, refreshTokenRaw);
+        // Build the user profile metadata payload
+        AuthResponse userInfo = AuthResponse.builder()
+                .email(userDetails.getUsername())
+                .roles(userDetails.getAuthorities().stream().map(GrantedAuthority::getAuthority).toList())
+                .build();
+
+        return jwtUtil.createAuthResponseWithCookies(accessToken, refreshTokenRaw, userInfo, "Login successful");
     }
 
-    public AuthResponse refresh(HttpServletRequest request) {
+    public ResponseEntity<?> refresh(HttpServletRequest request) {
 
         String refreshToken = extractRefreshToken(request);
 
@@ -110,13 +134,19 @@ public class UserService {
                 .orElseThrow(() -> new InvalidRefreshTokenException("Invalid refresh token"));
 
         CustomUserDetails userDetails = customUserDetailsService.loadUserByUserId(token.getUserId());
-        String newAccessToken = jwtUtil.generateAccessToken(userDetails);
+        String accessToken = jwtUtil.generateAccessToken(userDetails);
 
         // Rotate refresh token (security best practice)
         revokeToken(token);
         String refreshTokenRaw = generateNewRefreshToken(token.getUserId());
 
-        return jwtUtil.buildAuthResponse(newAccessToken, refreshTokenRaw);
+        // Build the user profile metadata payload
+        AuthResponse userInfo = AuthResponse.builder()
+                .email(userDetails.getUsername())
+                .roles(userDetails.getAuthorities().stream().map(GrantedAuthority::getAuthority).toList())
+                .build();
+
+        return jwtUtil.createAuthResponseWithCookies(accessToken, refreshTokenRaw, userInfo, "Token successful Refresh");
     }
 
     private void revokeToken(RefreshToken token) {
@@ -131,7 +161,7 @@ public class UserService {
             Cookie[] cookies = request.getCookies();
             if (cookies != null) {
                 for (Cookie cookie : cookies) {
-                    if ("refreshToken".equals(cookie.getName())) {
+                    if ("refresh_token".equals(cookie.getName())) {
                         token = cookie.getValue();
                     }
                 }
@@ -151,7 +181,9 @@ public class UserService {
         return rawToken;  // Return RAW to client
     }
 
-    public void logout(HttpServletRequest request) {
+    public ResponseEntity<?> logout(HttpServletRequest request) {
+
+        // 1. Process database token revocation
         String refreshToken = extractRefreshToken(request);
         log.info("Logout request refresh token: {}", refreshToken);
         RefreshToken token = refreshTokenRepo.findByTokenHash(RefreshToken.hash(refreshToken))
@@ -159,10 +191,32 @@ public class UserService {
 
         token.setRevoked(true);
         refreshTokenRepo.save(token);
+
+        // 2. Execute the complete structural server & browser wipe
+        return purgeEntireSession("Logout successful. All sessions and cookies cleared.");
+
     }
 
-    public void logoutAllDevices(Authentication auth) {
+    public ResponseEntity<?> logoutAllDevices(Authentication auth) {
+        // 1. Process database token revocation
         Long userId = ((CustomUserDetails) auth.getPrincipal()).getUserId();
         refreshTokenRepo.deleteByUserId(userId);
+
+        // 2. Execute the complete structural server & browser wipe
+        return purgeEntireSession("Logout successful. All sessions and cookies cleared.");
+    }
+
+    // Dynamic Global Clean: Purges security context and instructs browser to wipe all storage
+    public ResponseEntity<?> purgeEntireSession(String logoutMessage) {
+
+        // 1. Clear Server-Side Security Thread Variables instantly
+        SecurityContextHolder.clearContext();
+
+        // 2. Instruct Browser to clear all Cookies, Storage, and Cache flags
+        return ResponseEntity.ok()
+                // "cookies" tells the browser to wipe every cookie for your domain
+                // "storage" tells it to wipe localStorage / sessionStorage
+                .header("Clear-Site-Data", "\"cookies\", \"storage\"")
+                .body(Map.of("message", logoutMessage));
     }
 }
