@@ -9,6 +9,20 @@ spring:
     gateway:
       server:
         webflux:
+          globalcors:
+            cors-configurations:
+              '[/**]':
+                allowedOrigins:
+                  - "http://localhost:5173"    # Exact frontend URL (No wildcard '*' allowed for cookies)
+                allowedMethods:
+                  - GET
+                  - POST
+                  - PUT
+                  - DELETE
+                  - OPTIONS
+                allowedHeaders: "*"
+                allowCredentials: true         # CRITICAL: Required for HttpOnly cookie exchange
+                maxAge: 3600                   # Caches pre-flight OPTIONS request for 1 hour to save performance
           discovery:
             locator:
               enabled: true
@@ -17,7 +31,7 @@ spring:
             - id: user-service
               uri: lb://USER-SERVICE
               predicates:
-                - Path=/user/**
+                - Path=/api/auth/**
               filters:
                 - StripPrefix=1
 #                - RewritePath=/api/users/?(?<remaining>.*), /v1/users/${remaining}
