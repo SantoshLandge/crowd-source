@@ -5,14 +5,13 @@ import lombok.Builder;
 import lombok.Data;
 import lombok.NoArgsConstructor;
 
+import java.util.List;
+
 @Data
 @Builder
 @AllArgsConstructor
 @NoArgsConstructor
 public class AuthResponse {
-    private String accessToken;
-    private String tokenType = "Bearer";
-    private long expiresIn = 900;
-    private String refreshToken;
-    private long refreshExpiresIn = 604800;
+    private String email;
+    private List<String> roles;
 }

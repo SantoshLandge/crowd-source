@@ -19,12 +19,12 @@ public class Permission {
 
     @NotBlank
     @Column(nullable = false)
-    private String name;  // e.g., "read:users"
+    private String name;  // e.g., "read:user, create:event"
 
-    @Column(name = "resource")  // e.g., "users"
+    @Column(name = "resource")  // e.g., "user, event, payment"
     private String resource;
 
-    @Column(name = "action")    // e.g., "read"
+    @Column(name = "action")    // e.g., "create, read, update, delete"
     private String action;
 
 }

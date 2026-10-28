@@ -22,7 +22,7 @@ public class Role {
 
     @NotBlank
     @Column(nullable = false, unique = true)
-    private String name;  // "ROLE_ADMIN"
+    private String name;  // "ADMIN"
 
     @ManyToMany(fetch = FetchType.EAGER)
     @JoinTable(
