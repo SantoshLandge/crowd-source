@@ -9,60 +9,53 @@ spring:
     gateway:
       server:
         webflux:
-          globalcors:
-            cors-configurations:
-              '[/**]':
-                allowedOrigins:
-                  - "http://localhost:5173"    # Exact frontend URL (No wildcard '*' allowed for cookies)
-                allowedMethods:
-                  - GET
-                  - POST
-                  - PUT
-                  - DELETE
-                  - OPTIONS
-                allowedHeaders: "*"
-                allowCredentials: true         # CRITICAL: Required for HttpOnly cookie exchange
-                maxAge: 3600                   # Caches pre-flight OPTIONS request for 1 hour to save performance
-          discovery:
-            locator:
-              enabled: true
-              lower-case-service-id: true
+          # CORS is configured in SecurityConfig (needed so preflight requests pass authentication).
+          # The discovery locator is intentionally OFF: it would expose every service under /<service-id>/**
+          # and bypass the path based RBAC rules below.
           routes:
             - id: user-service
               uri: lb://USER-SERVICE
               predicates:
                 - Path=/api/auth/**
               filters:
-                - StripPrefix=1
-#                - RewritePath=/api/users/?(?<remaining>.*), /v1/users/${remaining}
+                - StripPrefix=1        # /api/auth/v1/login -> /auth/v1/login
 
             - id: event-service
               uri: lb://EVENT-SERVICE
               predicates:
                 - Path=/api/v1/event/**
               filters:
-                - StripPrefix=1
-#                - RewritePath=/api/v1/event/?(?<remaining>.*), /v1/event/${remaining}
+                - StripPrefix=1        # /api/v1/event/** -> /v1/event/**
 
             - id: registration-service
               uri: lb://REGISTRATION-SERVICE
               predicates:
                 - Path=/api/v1/registration/**
               filters:
-                - StripPrefix=1
-#                - RewritePath=/api/v1/registration/?(?<remaining>.*), /v1/registration/${remaining}
+                - StripPrefix=1        # /api/v1/registration/** -> /v1/registration/**
+
+            # payment-service is deliberately NOT routed: it is only called by registration-service.
 
   security:
     oauth2:
       resourceserver:
         jwt:
-          jwk-set-uri: http://localhost:8002/.well-known/jwks.json
+          jwk-set-uri: ${USER_SERVICE_JWKS_URI:http://localhost:8002/.well-known/jwks.json}
           jws-algorithms: ES256
+
+app:
+  cors:
+    allowed-origins: ${CORS_ALLOWED_ORIGINS:http://localhost:5173}
+  security:
+    jwt:
+      issuer: ${JWT_ISSUER:crowdsource-user-service}
+    # Shared with every downstream service (security.shared.gateway-secret). MUST be overridden outside local dev.
+    gateway-secret: ${GATEWAY_SHARED_SECRET:dev-only-gateway-secret-change-me-0123456789}
 
 eureka:
   client:
     service-url:
-      defaultZone: http://localhost:8761/eureka
+      defaultZone: ${EUREKA_URL:http://localhost:8761/eureka}
     fetch-registry: true
     register-with-eureka: true
 
@@ -70,18 +63,14 @@ management:
   endpoints:
     web:
       exposure:
-        include: health, info, gateway, routes
+        include: health, info, gateway
   endpoint:
     health:
-      show-details: always
+      show-details: never        # /actuator/health is public, do not leak internals
 
 logging:
   level:
     com.crowdsource.apigateway: DEBUG
-    org.springframework.security: DEBUG
+    org.springframework.security: INFO
     org.springframework.cloud.gateway: INFO
-    reactor.netty: DEBUG
-#    org.springframework.cloud.gateway.route.RouteDefinitionRouteLocator: DEBUG     # Route loading
-#    org.springframework.cloud.gateway.handler.RoutePredicateHandlerMapping: DEBUG  # Path matching
-#    org.springframework.cloud.gateway.filter.NettyRoutingFilter: DEBUG           # Backend forwarding
-#    org.springframework.cloud.gateway: INFO    # Errors + metrics only (Production)
+    # Do NOT enable reactor.netty DEBUG/wiretap: it logs request headers, i.e. cookies and tokens.

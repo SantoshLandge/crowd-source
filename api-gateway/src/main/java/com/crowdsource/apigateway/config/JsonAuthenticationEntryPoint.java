@@ -25,15 +25,15 @@ public class JsonAuthenticationEntryPoint implements ServerAuthenticationEntryPo
     @Override
     public Mono<Void> commence(ServerWebExchange exchange, AuthenticationException ex) {
         HttpStatus status = HttpStatus.UNAUTHORIZED;
-        String message = "Authentication token is missing, invalid, or expired";
+        String message = "Authentication token is missing or invalid";
 
-        // Check for JWT expiration
-        if (ex.getCause() instanceof org.springframework.security.oauth2.jwt.JwtValidationException) {
+        // The resource-server wraps decoder failures: InvalidBearerTokenException(cause = JwtValidationException ...)
+        Throwable cause = ex.getCause();
+        String detail = cause != null && cause.getMessage() != null ? cause.getMessage() : ex.getMessage();
+        if (detail != null && detail.toLowerCase().contains("expired")) {
             message = "JWT token has expired";
-        }
-        // Check for invalid bearer token - InvalidBearerTokenException
-        else if (ex instanceof org.springframework.security.oauth2.server.resource.InvalidBearerTokenException) {
-            message = "Invalid or expired JWT token";
+        } else if (ex instanceof org.springframework.security.oauth2.server.resource.InvalidBearerTokenException) {
+            message = "Invalid JWT token";
         }
 
         return write(exchange, status, message);
