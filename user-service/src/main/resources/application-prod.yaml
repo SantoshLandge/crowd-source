@@ -1,70 +1,37 @@
-server:
-  port: 8002
-
-# JWT Secret
-jwt:
-  private-key:
-    path: keys/private.pem
-  public-key:
-    path: keys/public.pem
-
+# Production overrides (activate with SPRING_PROFILES_ACTIVE=prod). Everything not listed here is inherited.
+# NOTE: you must add a real JDBC driver dependency (e.g. PostgreSQL) and a schema migration tool (Flyway/Liquibase);
+# ddl-auto=validate expects the schema to exist.
 spring:
-  application:
-    name: user-service
-
-  # H2 Database (local dev only)
   datasource:
-    url: jdbc:h2:mem:userdb      # In-memory H2
-    driver-class-name: org.h2.Driver
-    username: sa
-    password:
-
+    url: ${DB_URL}
+    username: ${DB_USERNAME}
+    password: ${DB_PASSWORD}
+    driver-class-name: ${DB_DRIVER}
   jpa:
     hibernate:
-      ddl-auto: validate  # Liquibase manages schema!
-    show-sql: false              # See SQL in logs
-    open-in-view: false
-    properties:
-      hibernate:
-        format_sql: true
+      ddl-auto: validate
+    show-sql: false
   h2:
     console:
-      enabled: true
-      path: /h2-console
-  liquibase:
-    change-log: classpath:liquibase/changelog-master.xml
-    enabled: true
-
+      enabled: false
   sql:
     init:
-      mode: always
+      mode: never
 
-  # Enable Spring Security DEBUG (shows filter chain execution)
+jwt:
+  private-key:
+    path: ${JWT_PRIVATE_KEY_PATH}     # e.g. file:/run/secrets/jwt-private.pem
+  public-key:
+    path: ${JWT_PUBLIC_KEY_PATH}
+
+security:
+  shared:
+    gateway-secret: ${GATEWAY_SHARED_SECRET}      # no default in prod: startup fails if missing
+
+app:
   security:
-    debug: true  # CRITICAL - shows exact filter execution order
+    cookie-secure: true
 
-
-eureka:
-  client:
-    service-url:
-      defaultZone: http://localhost:8761/eureka
-
-management:
-  endpoints:
-    web:
-      exposure:
-        include: health, info, metrics
-  endpoint:
-    health:
-      show-details: always
-
-
-# Enable DEBUG logging for critical Spring Security components
 logging:
   level:
-    com.crowdsource.userservice.security: DEBUG  # Your JWT filter & CustomUserDetails
-    org.springframework.security: DEBUG          # Full SecurityContext flow
-    org.springframework.security.web: DEBUG      # Filter chain
-    org.springframework.security.web.FilterChainProxy: DEBUG
-    root: INFO  # Keep everything else INFO
-
+    com.crowdsource: INFO

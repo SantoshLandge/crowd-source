@@ -6,10 +6,12 @@ import jakarta.validation.constraints.Size;
 import lombok.AllArgsConstructor;
 import lombok.Data;
 import lombok.NoArgsConstructor;
+import lombok.ToString;
 
 @Data
 @AllArgsConstructor
 @NoArgsConstructor
+@ToString(exclude = "password")
 public class SignupRequest {
 
     @NotBlank
@@ -20,7 +22,8 @@ public class SignupRequest {
     @Size(min = 3, max = 20)
     private String displayName;
 
+    // 72 = BCrypt's input limit; the old max of 16 needlessly prevented strong passphrases
     @NotBlank
-    @Size(min = 6, max = 16)
+    @Size(min = 8, max = 72, message = "Password must be between 8 and 72 characters")
     private String password;
 }

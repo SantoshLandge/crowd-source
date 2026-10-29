@@ -15,7 +15,7 @@ import java.util.stream.Collectors;
 @AllArgsConstructor
 public class CustomUserDetails implements UserDetails {
 
-    private final Long userId;
+    private final Long id;
     private final String username;  // EMAIL (login identifier)
     private final String password;
     private final boolean enabled;
@@ -23,7 +23,7 @@ public class CustomUserDetails implements UserDetails {
 
     // From User entity (email = username)
     public CustomUserDetails(User user) {
-        this.userId = user.getId();
+        this.id = user.getId();
         this.username = user.getEmail();  // EMAIL as username
         this.password = user.getPassword();
         this.enabled = user.isEnabled();
@@ -31,9 +31,9 @@ public class CustomUserDetails implements UserDetails {
     }
 
     // From JWT claims
-    public CustomUserDetails(Long userId, String email, String password,
+    public CustomUserDetails(Long id, String email, String password,
                              List<String> authorityStrings, boolean enabled) {
-        this.userId = userId;
+        this.id = id;
         this.username = email;  // Email
         this.password = password;
         this.enabled = enabled;

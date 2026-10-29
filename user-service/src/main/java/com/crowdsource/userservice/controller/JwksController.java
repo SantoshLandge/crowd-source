@@ -1,16 +1,23 @@
 package com.crowdsource.userservice.controller;
 
+import com.crowdsource.userservice.util.JwtUtil;
 import com.crowdsource.userservice.util.PemKeyLoader;
+import com.nimbusds.jose.JWSAlgorithm;
 import com.nimbusds.jose.jwk.Curve;
 import com.nimbusds.jose.jwk.ECKey;
 import com.nimbusds.jose.jwk.JWKSet;
+import com.nimbusds.jose.jwk.KeyUse;
 import lombok.extern.slf4j.Slf4j;
+import org.springframework.http.CacheControl;
+import org.springframework.http.ResponseEntity;
 import org.springframework.web.bind.annotation.GetMapping;
 import org.springframework.web.bind.annotation.RestController;
 
 import java.security.interfaces.ECPublicKey;
 import java.util.Map;
+import java.util.concurrent.TimeUnit;
 
+/** Publishes the public signing key. Consumed by the api-gateway to validate access tokens. */
 @Slf4j
 @RestController
 public class JwksController {
@@ -22,18 +29,17 @@ public class JwksController {
     }
 
     @GetMapping("/.well-known/jwks.json")
-    public Map<String, Object> getJwks() {
-        log.info("GET: /.well-known/jwks.json");
-        // 1. Cast the loaded PublicKey to ECPublicKey
+    public ResponseEntity<Map<String, Object>> getJwks() {
         ECPublicKey publicKey = (ECPublicKey) pemKeyLoader.getPublicKey();
 
-        // 2. Build the Nimbus ECKey object
-        // The 'kid' (Key ID) is important for rotation; for now, we use a static one
         ECKey jwk = new ECKey.Builder(Curve.P_256, publicKey)
-                .keyID("auth-key-1")
+                .keyUse(KeyUse.SIGNATURE)
+                .algorithm(JWSAlgorithm.ES256)
+                .keyID(JwtUtil.KEY_ID)          // same kid that JwtUtil puts into every token
                 .build();
 
-        // 3. Return the JWKSet as a Map (which Spring serializes to JSON)
-        return new JWKSet(jwk).toJSONObject();
+        return ResponseEntity.ok()
+                .cacheControl(CacheControl.maxAge(5, TimeUnit.MINUTES).cachePublic())
+                .body(new JWKSet(jwk).toJSONObject());
     }
 }

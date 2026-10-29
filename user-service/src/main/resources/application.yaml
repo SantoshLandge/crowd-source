@@ -1,12 +1,12 @@
 server:
   port: 8002
 
-# JWT Secret
+# ES256 signing keys. Any Spring resource location works (classpath:, file:). See PemKeyLoader for generation.
 jwt:
   private-key:
-    path: keys/private.pem
+    path: classpath:keys/private.pem
   public-key:
-    path: keys/public.pem
+    path: classpath:keys/public.pem
 
 spring:
   application:
@@ -14,16 +14,17 @@ spring:
 
   # H2 Database (local dev only)
   datasource:
-    url: jdbc:h2:mem:userdb      # In-memory H2
+    url: jdbc:h2:mem:userdb
     driver-class-name: org.h2.Driver
     username: sa
     password:
 
   jpa:
     hibernate:
-      ddl-auto: create  #update
-    show-sql: true
-    defer-datasource-initialization: true
+      ddl-auto: create
+    show-sql: false
+    open-in-view: false
+    defer-datasource-initialization: true   # run data.sql after Hibernate created the schema
   h2:
     console:
       enabled: true
@@ -34,32 +35,41 @@ spring:
       mode: always
       data-locations: classpath:data.sql
 
-  # Enable Spring Security DEBUG (shows filter chain execution)
-  security:
-    debug: true  # CRITICAL - shows exact filter execution order
+security:
+  shared:
+    gateway-secret: ${GATEWAY_SHARED_SECRET:dev-only-gateway-secret-change-me-0123456789}
+    # Paths (as seen by this service, i.e. after the gateway's StripPrefix) that need no authentication
+    public-paths:
+      - /auth/v1/signup
+      - /auth/v1/login
+      - /auth/v1/refresh
+      - /auth/v1/logout
+      - /.well-known/jwks.json
 
+app:
+  security:
+    jwt:
+      issuer: ${JWT_ISSUER:crowdsource-user-service}     # must match the api-gateway
+    cookie-secure: false          # true in the prod profile (HTTPS)
+    cookie-same-site: Lax
+    refresh-cookie-path: /api/auth/v1   # refresh cookie only travels to the auth endpoints
 
 eureka:
   client:
     service-url:
-      defaultZone: http://localhost:8761/eureka
+      defaultZone: ${EUREKA_URL:http://localhost:8761/eureka}
 
 management:
   endpoints:
     web:
       exposure:
-        include: health, info, metrics
+        include: health, info
   endpoint:
     health:
-      show-details: always
+      show-details: never
 
-
-# Enable DEBUG logging for critical Spring Security components
 logging:
   level:
-    com.crowdsource.userservice.security: DEBUG  # Your JWT filter & CustomUserDetails
-    org.springframework.security: DEBUG          # Full SecurityContext flow
-    org.springframework.security.web: DEBUG      # Filter chain
-    org.springframework.security.web.FilterChainProxy: DEBUG
-    root: INFO  # Keep everything else INFO
-
+    root: INFO
+    com.crowdsource: DEBUG
+    org.springframework.security: INFO

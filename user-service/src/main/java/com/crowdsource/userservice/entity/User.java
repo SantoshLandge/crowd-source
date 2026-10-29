@@ -6,28 +6,35 @@ import jakarta.validation.constraints.Email;
 import jakarta.validation.constraints.NotBlank;
 import lombok.AllArgsConstructor;
 import lombok.Builder;
-import lombok.Data;
+import lombok.EqualsAndHashCode;
+import lombok.Getter;
 import lombok.NoArgsConstructor;
+import lombok.Setter;
+import lombok.ToString;
 import org.hibernate.annotations.CreationTimestamp;
 import org.hibernate.annotations.UpdateTimestamp;
 import org.springframework.security.core.GrantedAuthority;
+import org.springframework.security.core.authority.SimpleGrantedAuthority;
 
 import java.time.LocalDateTime;
 import java.util.Collection;
 import java.util.HashSet;
+import java.util.LinkedHashSet;
 import java.util.Set;
-import java.util.stream.Collectors;
-import java.util.stream.Stream;
 
-@Data
+@Getter
+@Setter
 @Entity
 @Builder
 @NoArgsConstructor
 @AllArgsConstructor
+@ToString(exclude = {"password", "roles"})          // never print the password hash
+@EqualsAndHashCode(onlyExplicitlyIncluded = true)
 @Table(name = "users", uniqueConstraints = @UniqueConstraint(columnNames = "email"))
 public class User {
 
     @Id
+    @EqualsAndHashCode.Include
     @GeneratedValue(strategy = GenerationType.IDENTITY)
     private Long id;
 
@@ -41,21 +48,16 @@ public class User {
     private String password;  // BCrypt hash
 
     @Column(name = "display_name")
-    private String displayName;         // User-friendly name (can be changed)
+    private String displayName;
 
-    @Column(name = "first_name")
-    private String firstName;           // Optional
-
-    @Column(name = "last_name")
-    private String lastName;            // Optional
-
+    @Builder.Default
     @Enumerated(EnumType.STRING)
     @Column(nullable = false)
     private UserStatus status = UserStatus.ACTIVE;
 
-    @Column(name = "email_verified")
     @Builder.Default
-    private Boolean emailVerified = false;  // Default to false      // For email verification flow
+    @Column(name = "email_verified")
+    private Boolean emailVerified = false;
 
     @CreationTimestamp
     @Column(nullable = false, updatable = false)
@@ -68,36 +70,25 @@ public class User {
     @Column(name = "last_login_at")
     private LocalDateTime lastLoginAt;
 
+    @Builder.Default
     @ManyToMany(fetch = FetchType.EAGER)
     @JoinTable(name = "user_roles", joinColumns = @JoinColumn(name = "user_id"), inverseJoinColumns = @JoinColumn(name = "role_id"))
     private Set<Role> roles = new HashSet<>();
 
-    @OneToMany(mappedBy = "userId", cascade = CascadeType.REMOVE, fetch = FetchType.LAZY)
-    private Set<RefreshToken> refreshTokens = new HashSet<>();
+    // NOTE: the former @OneToMany refreshTokens (mappedBy = "userId") was removed. RefreshToken.userId is a plain
+    // column, not an association, so Hibernate failed at startup. Tokens are managed via RefreshTokenRepository.
 
     public void addRole(Role role) {
         roles.add(role);
     }
 
-    public void revokeAllRefreshTokens() {
-        refreshTokens.forEach(t -> t.setRevoked(true));
-    }
-
-    // Helper: for CustomUserDetails
+    /** Roles as ROLE_xxx plus the permissions of every role (de-duplicated). */
     public Collection<? extends GrantedAuthority> getAuthorities() {
-
-        return Stream.concat(
-                        // ROLES (Spring convention)
-                        roles.stream()
-                                .map(role -> (GrantedAuthority) () -> "ROLE_" + role.getName()),
-
-                        // Role Permissions
-                        roles.stream()
-                                .flatMap(role -> role.getPermissions().stream())
-                                .map(p -> (GrantedAuthority) p::getName)
-                )
-                .collect(Collectors.toList());
-
+        Set<GrantedAuthority> authorities = new LinkedHashSet<>();
+        roles.forEach(role -> authorities.add(new SimpleGrantedAuthority("ROLE_" + role.getName())));
+        roles.forEach(role -> role.getPermissions()
+                .forEach(permission -> authorities.add(new SimpleGrantedAuthority(permission.getName()))));
+        return authorities;
     }
 
     public boolean isEnabled() {
