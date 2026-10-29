@@ -1,4 +1,4 @@
-package com.crowdsource.eventservice.repo;
+package com.crowdsource.eventservice.repository;
 
 import com.crowdsource.eventservice.entity.EventDetails;
 import org.springframework.data.jpa.repository.JpaRepository;

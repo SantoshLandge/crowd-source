@@ -1,23 +1,54 @@
 package com.crowdsource.registrationservice.client;
 
-import org.springframework.cloud.openfeign.FeignClient;
-import org.springframework.web.bind.annotation.GetMapping;
-import org.springframework.web.bind.annotation.PathVariable;
-import org.springframework.web.bind.annotation.PostMapping;
-import org.springframework.web.bind.annotation.RequestParam;
+import com.crowdsource.registrationservice.dto.EventView;
+import com.crowdsource.registrationservice.exception.RegistrationConflictException;
+import com.crowdsource.registrationservice.exception.RegistrationNotFoundException;
+import com.crowdsource.registrationservice.exception.UpstreamServiceException;
+import org.springframework.cloud.client.loadbalancer.LoadBalanced;
+import org.springframework.stereotype.Component;
+import org.springframework.web.client.HttpClientErrorException;
+import org.springframework.web.client.RestClient;
+import org.springframework.web.client.RestClientException;
 
-@FeignClient(name = "event-service")
-public interface EventClient {
+@Component
+public class EventClient {
 
-    @GetMapping("/v1/event/{id}/capacity")
-    Integer checkCapacity(@PathVariable("id") Long eventId);
+    private final RestClient client;
 
-    @PostMapping("/v1/event/{id}/capacity/hold")
-    void holdCapacity(@PathVariable("id") Long eventId, @RequestParam int quantity);
+    public EventClient(@LoadBalanced RestClient.Builder builder) {
+        this.client = builder.clone().baseUrl("http://event-service").build();
+    }
 
-    @PostMapping("/v1/event/{id}/capacity/confirm")
-    void confirmCapacity(@PathVariable("id") Long eventId, @RequestParam int quantity);
+    public EventView getEvent(Long eventId) {
+        try {
+            return client.get().uri("/v1/event/{id}", eventId).retrieve().body(EventView.class);
+        } catch (HttpClientErrorException.NotFound e) {
+            throw new RegistrationNotFoundException("Event " + eventId + " not found");
+        } catch (RestClientException e) {
+            throw new UpstreamServiceException("event-service call failed", e);
+        }
+    }
 
-    @PostMapping("/v1/event/{id}/capacity/release")
-    void releaseCapacity(@PathVariable("id") Long eventId, @RequestParam int quantity);
+    /** Atomically reserves seats; 409 from event-service means sold out / not open. */
+    public void reserve(Long eventId, int quantity) {
+        try {
+            client.post().uri("/v1/event/{id}/capacity/reserve?quantity={q}", eventId, quantity)
+                    .retrieve().toBodilessEntity();
+        } catch (HttpClientErrorException.Conflict e) {
+            throw new RegistrationConflictException("Not enough tickets available");
+        } catch (HttpClientErrorException.NotFound e) {
+            throw new RegistrationNotFoundException("Event " + eventId + " not found");
+        } catch (RestClientException e) {
+            throw new UpstreamServiceException("event-service call failed", e);
+        }
+    }
+
+    public void release(Long eventId, int quantity) {
+        try {
+            client.post().uri("/v1/event/{id}/capacity/release?quantity={q}", eventId, quantity)
+                    .retrieve().toBodilessEntity();
+        } catch (RestClientException e) {
+            throw new UpstreamServiceException("event-service call failed", e);
+        }
+    }
 }

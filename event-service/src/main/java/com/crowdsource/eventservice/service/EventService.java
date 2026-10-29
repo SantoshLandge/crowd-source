@@ -1,88 +1,211 @@
 package com.crowdsource.eventservice.service;
 
-import com.crowdsource.eventservice.dto.CreateEventRequest;
+import com.crowdsource.eventservice.dto.CreateEvent;
 import com.crowdsource.eventservice.dto.EventResponse;
 import com.crowdsource.eventservice.entity.Event;
 import com.crowdsource.eventservice.entity.EventDetails;
 import com.crowdsource.eventservice.entity.type.EventStatus;
-import com.crowdsource.eventservice.repo.EventDetailsRepository;
-import com.crowdsource.eventservice.repo.EventRepository;
+import com.crowdsource.eventservice.entity.type.EventType;
+import com.crowdsource.eventservice.exception.EventNotFoundException;
+import com.crowdsource.eventservice.exception.InsufficientCapacityException;
+import com.crowdsource.eventservice.exception.InvalidEventStateException;
+import com.crowdsource.eventservice.repository.EventDetailsRepository;
+import com.crowdsource.eventservice.repository.EventRepository;
 import lombok.RequiredArgsConstructor;
 import lombok.extern.slf4j.Slf4j;
-import org.springframework.kafka.core.KafkaTemplate;
+import org.springframework.security.access.AccessDeniedException;
+import org.springframework.security.core.Authentication;
+import org.springframework.security.core.context.SecurityContextHolder;
 import org.springframework.stereotype.Service;
 import org.springframework.transaction.annotation.Transactional;
 
-import java.time.LocalDateTime;
 import java.util.List;
-import java.util.Map;
-import java.util.stream.Collectors;
 
+/**
+ * Event lifecycle: DRAFT -> (organizer submits) PENDING -> (admin approves) LIVE; CANCELLED from any state.
+ * Method-level role checks live on the controller; resource-level checks (ownership) live here.
+ */
+@Slf4j
 @Service
 @RequiredArgsConstructor
-@Slf4j
 public class EventService {
+
     private final EventRepository eventRepository;
-    private final KafkaTemplate<String, Object> kafkaTemplate;
-    private final EventDetailsRepository eventDetailsRepository;  // ADD THIS
+    private final EventDetailsRepository eventDetailsRepository;
+
+    // ------------------------------------------------------------------ queries
+
+    @Transactional(readOnly = true)
+    public List<EventResponse> listLiveEvents() {
+        return eventRepository.findByStatusOrderByEventDateAsc(EventStatus.LIVE).stream().map(EventResponse::from).toList();
+    }
+
+    @Transactional(readOnly = true)
+    public List<EventResponse> listMyEvents() {
+        List<Event> events = isAdmin() ? eventRepository.findAll()
+                : eventRepository.findByOrganizerIdOrderByEventDateAsc(currentUserId());
+        return events.stream().map(EventResponse::from).toList();
+    }
+
+    /** LIVE events are visible to everybody; other states only to the owner and admins (404 otherwise). */
+    @Transactional(readOnly = true)
+    public EventResponse getEvent(Long id) {
+        Event event = find(id);
+        if (event.getStatus() != EventStatus.LIVE && !canManage(event)) {
+            throw new EventNotFoundException("Event " + id + " not found");
+        }
+        return EventResponse.from(event);
+    }
+
+    // ------------------------------------------------------------------ commands
 
     @Transactional
-    public EventResponse createEvent(CreateEventRequest req) {
-        Long organizerId = getCurrentOrganizerId();  // From JWT principal
+    public EventResponse createEvent(CreateEvent req) {
         Event event = Event.builder()
-                .title(req.getTitle())
-                .description(req.getDescription())
-                .type(req.getType())
-                .venue(req.getVenue())
-                .capacity(req.getCapacity())
-                .startAt(req.getStartAt())
-                .endAt(req.getEndAt())
-                .organizerId(organizerId)
+                .title(req.title().trim())
+                .category(req.category())
+                .eventDate(req.eventDate())
+                .description(req.description())
+                .eventType(req.eventType() != null ? req.eventType() : EventType.PHYSICAL)
+                .venue(req.venue())
+                .totalCapacity(req.totalCapacity())
+                .availableCapacity(req.totalCapacity())
+                .ticketPrice(req.ticketPrice())
                 .status(EventStatus.DRAFT)
+                .organizerId(currentUserId())
                 .build();
         event = eventRepository.save(event);
 
-        // Save details
-        EventDetails details = EventDetails.builder().eventId(event.getId()).build();
-        eventDetailsRepository.save(details);
-
-        // Kafka: Submit for approval
-        kafkaTemplate.send("event-submitted", event.getId().toString(), Map.of(
-                "eventId", event.getId(),
-                "organizerId", organizerId,
-                "title", event.getTitle()
-        ));
-
-        log.info("Event {} submitted by organizer {}", event.getId(), organizerId);
-        return toResponse(event);
-    }
-
-    public List<EventResponse> searchEvents(EventStatus status, LocalDateTime date) {
-        return eventRepository.searchLiveEvents(status, date).stream()
-                .map(this::toResponse)
-                .collect(Collectors.toList());
-    }
-
-    public EventResponse getEvent(Long id) {
-        return toResponse(eventRepository.findById(id).orElseThrow());
+        eventDetailsRepository.save(EventDetails.builder().eventId(event.getId()).build());
+        log.info("Event {} created by user {}", event.getId(), event.getOrganizerId());
+        return EventResponse.from(event);
     }
 
     @Transactional
-    public void updateEvent(Long id, CreateEventRequest req) {
-        Long organizerId = getCurrentOrganizerId();
-        Event event = eventRepository.findByIdAndOrganizerId(id, organizerId)
-                .orElseThrow(() -> new RuntimeException("Not found or unauthorized"));
-        // Update fields...
-        eventRepository.save(event);
+    public EventResponse updateEvent(Long id, CreateEvent req) {
+        Event event = findManageable(id);
+        if (event.getStatus() != EventStatus.DRAFT) {
+            throw new InvalidEventStateException("Only DRAFT events can be edited (current: " + event.getStatus() + ")");
+        }
+        event.setTitle(req.title().trim());
+        event.setCategory(req.category());
+        event.setEventDate(req.eventDate());
+        event.setDescription(req.description());
+        event.setEventType(req.eventType() != null ? req.eventType() : EventType.PHYSICAL);
+        event.setVenue(req.venue());
+        event.setTotalCapacity(req.totalCapacity());
+        event.setAvailableCapacity(req.totalCapacity());   // DRAFT: nothing sold yet
+        event.setTicketPrice(req.ticketPrice());
+        return EventResponse.from(eventRepository.save(event));
     }
 
-    // Helpers
-    private Long getCurrentOrganizerId() {
-        // Extract from SecurityContext: ((UserDetailsImpl) principal).getUser().getId()
-        return 1L; // TODO: Implement JWT principal extractor
+    @Transactional
+    public EventResponse submit(Long id) {
+        Event event = findManageable(id);
+        requireStatus(event, EventStatus.DRAFT, "submitted");
+        event.setStatus(EventStatus.PENDING);
+        return EventResponse.from(eventRepository.save(event));
     }
 
-    private EventResponse toResponse(Event e) {
-        return EventResponse.builder().id(e.getId()).status(e.getStatus()) /* etc */ .build();
+    /** Admin only (enforced on the controller). */
+    @Transactional
+    public EventResponse approve(Long id) {
+        Event event = find(id);
+        requireStatus(event, EventStatus.PENDING, "approved");
+        event.setStatus(EventStatus.LIVE);
+        return EventResponse.from(eventRepository.save(event));
+    }
+
+    @Transactional
+    public EventResponse cancel(Long id) {
+        Event event = findManageable(id);
+        if (event.getStatus() == EventStatus.CANCELLED) {
+            throw new InvalidEventStateException("Event is already cancelled");
+        }
+        event.setStatus(EventStatus.CANCELLED);
+        return EventResponse.from(eventRepository.save(event));
+    }
+
+    @Transactional
+    public void delete(Long id) {
+        Event event = findManageable(id);
+        if (event.getStatus() != EventStatus.DRAFT) {
+            throw new InvalidEventStateException("Only DRAFT events can be deleted; cancel the event instead");
+        }
+        eventDetailsRepository.deleteById(id);
+        eventRepository.delete(event);
+    }
+
+    // ------------------------------------------------------------------ capacity (internal, called by registration-service)
+
+    @Transactional(readOnly = true)
+    public int availableCapacity(Long id) {
+        return find(id).getAvailableCapacity();
+    }
+
+    /** Atomically reserves seats. */
+    @Transactional
+    public void reserveCapacity(Long id, int quantity) {
+        find(id);   // 404 if unknown
+        if (eventRepository.reduceCapacity(id, quantity) == 0) {
+            throw new InsufficientCapacityException("Not enough capacity (or event is not open for registration)");
+        }
+        log.info("Reserved {} seats for event {}", quantity, id);
+    }
+
+    @Transactional
+    public void releaseCapacity(Long id, int quantity) {
+        find(id);
+        if (eventRepository.increaseCapacity(id, quantity) == 0) {
+            throw new InvalidEventStateException("Cannot release " + quantity + " seats: would exceed total capacity");
+        }
+        log.info("Released {} seats for event {}", quantity, id);
+    }
+
+    // ------------------------------------------------------------------ helpers
+
+    private Event find(Long id) {
+        return eventRepository.findById(id)
+                .orElseThrow(() -> new EventNotFoundException("Event " + id + " not found"));
+    }
+
+    private Event findManageable(Long id) {
+        Event event = find(id);
+        if (!canManage(event)) {
+            throw new AccessDeniedException("You do not own this event");
+        }
+        return event;
+    }
+
+    private boolean canManage(Event event) {
+        return isAdmin() || event.getOrganizerId().equals(currentUserId());
+    }
+
+    private void requireStatus(Event event, EventStatus expected, String action) {
+        if (event.getStatus() != expected) {
+            throw new InvalidEventStateException("Event can only be " + action + " from status " + expected
+                    + " (current: " + event.getStatus() + ")");
+        }
+    }
+
+    private Authentication auth() {
+        Authentication auth = SecurityContextHolder.getContext().getAuthentication();
+        if (auth == null || !auth.isAuthenticated()) {
+            throw new AccessDeniedException("Authentication required");
+        }
+        return auth;
+    }
+
+    /** The principal is the user id (String) provided by the signed gateway headers. */
+    private Long currentUserId() {
+        try {
+            return Long.valueOf(auth().getName());
+        } catch (NumberFormatException e) {
+            throw new AccessDeniedException("Invalid user identity");
+        }
+    }
+
+    private boolean isAdmin() {
+        return auth().getAuthorities().stream().anyMatch(a -> "ROLE_ADMIN".equals(a.getAuthority()));
     }
 }

@@ -23,6 +23,6 @@ public class EventDetails {
 
     private String imageUrl;
 
-    @JdbcTypeCode(SqlTypes.JSON)  // Dynamic metadata (Jmix-like)
-    private String metadata;  // {"tags": [], "agenda": []}
+    @JdbcTypeCode(SqlTypes.JSON)
+    private String metadata;
 }

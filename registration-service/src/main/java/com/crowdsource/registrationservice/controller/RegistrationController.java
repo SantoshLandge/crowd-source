@@ -1,43 +1,43 @@
 package com.crowdsource.registrationservice.controller;
 
 import com.crowdsource.registrationservice.dto.RegistrationRequest;
-import com.crowdsource.registrationservice.entity.Registration;
-import com.crowdsource.registrationservice.repository.RegistrationRepository;
+import com.crowdsource.registrationservice.dto.RegistrationResponse;
 import com.crowdsource.registrationservice.service.RegistrationService;
+import jakarta.validation.Valid;
 import lombok.RequiredArgsConstructor;
+import org.springframework.http.HttpStatus;
 import org.springframework.http.ResponseEntity;
+import org.springframework.security.access.prepost.PreAuthorize;
 import org.springframework.web.bind.annotation.*;
 
 import java.util.List;
 
+/** Reached through the gateway as /api/v1/registration/** (StripPrefix=1). */
 @RestController
 @RequestMapping("/v1/registration")
 @RequiredArgsConstructor
+@PreAuthorize("isAuthenticated()")
 public class RegistrationController {
 
-    private final RegistrationService registrationService;
-    private final RegistrationRepository registrationRepository;
+    private final RegistrationService service;
 
     @PostMapping
-    public ResponseEntity<Registration> register(@RequestBody RegistrationRequest request) {
-        return ResponseEntity.ok(registrationService.register(request));
+    public ResponseEntity<RegistrationResponse> register(@Valid @RequestBody RegistrationRequest request) {
+        return ResponseEntity.status(HttpStatus.CREATED).body(service.register(request));
     }
 
-    @GetMapping
-    public List<Registration> getAll() {
-        return registrationRepository.findAll();
+    @GetMapping("/mine")
+    public List<RegistrationResponse> mine() {
+        return service.myRegistrations();
     }
 
     @GetMapping("/{id}")
-    public ResponseEntity<Registration> getById(@PathVariable Long id) {
-        return registrationRepository.findById(id)
-                .map(ResponseEntity::ok)
-                .orElse(ResponseEntity.notFound().build());
+    public RegistrationResponse get(@PathVariable Long id) {
+        return service.get(id);
     }
 
     @PostMapping("/{id}/cancel")
-    public ResponseEntity<Void> cancel(@PathVariable Long id) {
-        registrationService.cancelRegistration(id);
-        return ResponseEntity.ok().build();
+    public RegistrationResponse cancel(@PathVariable Long id) {
+        return service.cancel(id);
     }
 }

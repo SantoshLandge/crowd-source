@@ -2,100 +2,153 @@ package com.crowdsource.registrationservice.service;
 
 import com.crowdsource.registrationservice.client.EventClient;
 import com.crowdsource.registrationservice.client.PaymentClient;
+import com.crowdsource.registrationservice.dto.EventView;
+import com.crowdsource.registrationservice.dto.PaymentResult;
 import com.crowdsource.registrationservice.dto.RegistrationRequest;
+import com.crowdsource.registrationservice.dto.RegistrationResponse;
 import com.crowdsource.registrationservice.entity.Registration;
+import com.crowdsource.registrationservice.entity.RegistrationStatus;
+import com.crowdsource.registrationservice.exception.RegistrationConflictException;
+import com.crowdsource.registrationservice.exception.RegistrationNotFoundException;
 import com.crowdsource.registrationservice.repository.RegistrationRepository;
 import lombok.RequiredArgsConstructor;
 import lombok.extern.slf4j.Slf4j;
+import org.springframework.security.access.AccessDeniedException;
+import org.springframework.security.core.Authentication;
+import org.springframework.security.core.context.SecurityContextHolder;
 import org.springframework.stereotype.Service;
-import org.springframework.transaction.annotation.Transactional;
 
 import java.math.BigDecimal;
-import java.time.LocalDateTime;
+import java.util.List;
 
+/**
+ * Registration saga: verify event -> reserve seats (atomic) -> charge -> CONFIRMED.
+ * Any failure after the reservation releases the seats again and marks the registration FAILED.
+ * Deliberately not @Transactional: remote calls must not run inside a DB transaction, and each state change
+ * has to be committed immediately so a failed attempt is still recorded.
+ */
+@Slf4j
 @Service
 @RequiredArgsConstructor
-@Slf4j
 public class RegistrationService {
 
-    private final RegistrationRepository registrationRepository;
+    private final RegistrationRepository repository;
     private final EventClient eventClient;
     private final PaymentClient paymentClient;
 
-    @Transactional
-    public Registration register(RegistrationRequest request) {
-        log.info("Processing registration for event: {}", request.getEventId());
+    public RegistrationResponse register(RegistrationRequest request) {
+        Long userId = currentUserId();
+        int quantity = request.quantity();
 
-        // 1. Check event capacity
-        Integer availableCapacity = eventClient.checkCapacity(request.getEventId());
-        if (availableCapacity < request.getTicketQuantity()) {
-            throw new RuntimeException("No capacity available. Available: " + availableCapacity);
+        EventView event = eventClient.getEvent(request.eventId());   // price comes from the server, never from the client
+        if (!"LIVE".equals(event.status())) {
+            throw new RegistrationConflictException("Event is not open for registration");
+        }
+        BigDecimal total = BigDecimal.valueOf(event.ticketPrice()).multiply(BigDecimal.valueOf(quantity));
+
+        Registration registration = repository.save(Registration.builder()
+                .userId(userId)
+                .eventId(event.id())
+                .quantity(quantity)
+                .totalAmount(total)
+                .status(RegistrationStatus.PENDING)
+                .build());
+
+        try {
+            eventClient.reserve(event.id(), quantity);
+        } catch (RuntimeException e) {
+            markFailed(registration);
+            throw e;
         }
 
-        // 2. Hold capacity temporarily
-        eventClient.holdCapacity(request.getEventId(), request.getTicketQuantity());
+        if (total.signum() > 0) {
+            PaymentResult payment;
+            try {
+                payment = paymentClient.process(String.valueOf(registration.getId()), total);
+            } catch (RuntimeException e) {
+                // Payment is idempotent per registration id, so an ambiguous failure can be reconciled/retried
+                compensate(registration);
+                throw e;
+            }
+            if (payment == null || !"SUCCESS".equals(payment.status())) {
+                compensate(registration);
+                throw new RegistrationConflictException("Payment was declined");
+            }
+            registration.setPaymentId(payment.paymentId());
+        }
 
-        // 3. Create registration
-        Registration registration = new Registration();
-        registration.setEventId(request.getEventId());
-        registration.setAttendeeName(request.getAttendeeName());
-        registration.setAttendeeEmail(request.getAttendeeEmail());
-        registration.setTicketQuantity(request.getTicketQuantity());
-        registration.setTotalAmount(BigDecimal.valueOf(request.getTicketQuantity() * 100));
-        registration.setStatus("PENDING");
-        registration.setRegistrationDate(LocalDateTime.now());
+        registration.setStatus(RegistrationStatus.CONFIRMED);
+        log.info("Registration {} confirmed for user {} (event {}, qty {})",
+                registration.getId(), userId, event.id(), quantity);
+        return RegistrationResponse.from(repository.save(registration));
+    }
 
-        registration = registrationRepository.save(registration);
-        log.info("Registration created with ID: {}", registration.getId());
+    public List<RegistrationResponse> myRegistrations() {
+        return repository.findByUserIdOrderByCreatedAtDesc(currentUserId()).stream()
+                .map(RegistrationResponse::from).toList();
+    }
 
-        // 4. Process payment
+    public RegistrationResponse get(Long id) {
+        return RegistrationResponse.from(findAccessible(id));
+    }
+
+    public RegistrationResponse cancel(Long id) {
+        Registration registration = findAccessible(id);
+        if (registration.getStatus() != RegistrationStatus.CONFIRMED) {
+            throw new RegistrationConflictException("Only CONFIRMED registrations can be cancelled");
+        }
+        if (registration.getPaymentId() != null) {
+            paymentClient.refund(registration.getPaymentId());   // if this fails nothing has changed yet
+        }
+        eventClient.release(registration.getEventId(), registration.getQuantity());
+        registration.setStatus(RegistrationStatus.CANCELLED);
+        return RegistrationResponse.from(repository.save(registration));
+    }
+
+    // ---------------------------------------------------------------- helpers
+
+    private void compensate(Registration registration) {
         try {
-            String paymentId = paymentClient.processPayment(
-                    registration.getId().toString(),
-                    registration.getTotalAmount()
-            );
+            eventClient.release(registration.getEventId(), registration.getQuantity());
+        } catch (RuntimeException e) {
+            log.error("MANUAL ACTION NEEDED: could not release {} seats of event {} for registration {}",
+                    registration.getQuantity(), registration.getEventId(), registration.getId(), e);
+        }
+        markFailed(registration);
+    }
 
-            registration.setPaymentId(paymentId);
-            registration.setStatus("CONFIRMED");
+    private void markFailed(Registration registration) {
+        registration.setStatus(RegistrationStatus.FAILED);
+        repository.save(registration);
+    }
 
-            // 5. Confirm capacity (permanent reduction)
-            eventClient.confirmCapacity(request.getEventId(), request.getTicketQuantity());
+    /** Owner or admin; everybody else gets a 404 so ids cannot be probed. */
+    private Registration findAccessible(Long id) {
+        Registration registration = repository.findById(id)
+                .orElseThrow(() -> new RegistrationNotFoundException("Registration " + id + " not found"));
+        if (!registration.getUserId().equals(currentUserId()) && !isAdmin()) {
+            throw new RegistrationNotFoundException("Registration " + id + " not found");
+        }
+        return registration;
+    }
 
-            registrationRepository.save(registration);
-            log.info("Registration confirmed: {}", registration.getId());
+    private Authentication auth() {
+        Authentication auth = SecurityContextHolder.getContext().getAuthentication();
+        if (auth == null || !auth.isAuthenticated()) {
+            throw new AccessDeniedException("Authentication required");
+        }
+        return auth;
+    }
 
-            return registration;
-
-        } catch (Exception e) {
-            log.error("Payment failed: {}", e.getMessage());
-            registration.setStatus("FAILED");
-            registrationRepository.save(registration);
-
-            // Release the held capacity
-            eventClient.releaseCapacity(request.getEventId(), request.getTicketQuantity());
-
-            throw new RuntimeException("Payment processing failed: " + e.getMessage());
+    private Long currentUserId() {
+        try {
+            return Long.valueOf(auth().getName());
+        } catch (NumberFormatException e) {
+            throw new AccessDeniedException("Invalid user identity");
         }
     }
 
-    @Transactional
-    public void cancelRegistration(Long registrationId) {
-        Registration registration = registrationRepository.findById(registrationId)
-                .orElseThrow(() -> new RuntimeException("Registration not found"));
-
-        if (!"CONFIRMED".equals(registration.getStatus())) {
-            throw new RuntimeException("Only confirmed registrations can be cancelled");
-        }
-
-        // Process refund
-        paymentClient.processRefund(registration.getPaymentId());
-
-        // Release capacity back to event
-        eventClient.releaseCapacity(registration.getEventId(), registration.getTicketQuantity());
-
-        registration.setStatus("CANCELLED");
-        registrationRepository.save(registration);
-
-        log.info("Registration cancelled: {}", registrationId);
+    private boolean isAdmin() {
+        return auth().getAuthorities().stream().anyMatch(a -> "ROLE_ADMIN".equals(a.getAuthority()));
     }
 }

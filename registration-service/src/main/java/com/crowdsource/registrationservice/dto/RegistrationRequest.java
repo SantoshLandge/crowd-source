@@ -1,13 +1,11 @@
 package com.crowdsource.registrationservice.dto;
 
-import lombok.Data;
+import jakarta.validation.constraints.Max;
+import jakarta.validation.constraints.Min;
+import jakarta.validation.constraints.NotNull;
 
-@Data
-public class RegistrationRequest {
-
-    private Long eventId;
-    private Integer ticketQuantity;
-    private String attendeeName;
-    private String attendeeEmail;
-
+public record RegistrationRequest(
+        @NotNull Long eventId,
+        @NotNull @Min(1) @Max(10) Integer quantity
+) {
 }

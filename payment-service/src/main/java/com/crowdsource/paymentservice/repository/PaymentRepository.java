@@ -3,6 +3,8 @@ package com.crowdsource.paymentservice.repository;
 import com.crowdsource.paymentservice.entity.Payment;
 import org.springframework.data.jpa.repository.JpaRepository;
 
+import java.util.Optional;
+
 public interface PaymentRepository extends JpaRepository<Payment, Long> {
-    Payment findByRegistrationId(String registrationId);
+    Optional<Payment> findFirstByRegistrationIdOrderByIdDesc(String registrationId);
 }

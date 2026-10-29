@@ -5,9 +5,8 @@ spring:
   application:
     name: event-service
 
-  # H2 Database (local dev only)
   datasource:
-    url: jdbc:h2:mem:eventdb      # In-memory H2
+    url: jdbc:h2:mem:eventdb
     driver-class-name: org.h2.Driver
     username: sa
     password:
@@ -15,7 +14,8 @@ spring:
   jpa:
     hibernate:
       ddl-auto: update
-    show-sql: true
+    show-sql: false
+    open-in-view: false
   h2:
     console:
       enabled: true
@@ -25,17 +25,15 @@ spring:
     init:
       mode: always
 
-  security:
-    oauth2:
-      resourceserver:
-        jwt:
-          jwk-set-uri: http://localhost:8002/.well-known/jwks.json
-          jws-algorithms: ES256
+# No JWT handling here: the gateway validates the token and forwards HMAC-signed identity headers.
+security:
+  shared:
+    gateway-secret: ${GATEWAY_SHARED_SECRET:dev-only-gateway-secret-change-me-0123456789}
 
 eureka:
   client:
     service-url:
-      defaultZone: http://localhost:8761/eureka
+      defaultZone: ${EUREKA_URL:http://localhost:8761/eureka}
 
 management:
   endpoints:
@@ -44,4 +42,4 @@ management:
         include: health, info
   endpoint:
     health:
-      show-details: always
+      show-details: never
