@@ -1,7 +1,7 @@
 package com.crowdsource.apigateway.config;
 
 import com.crowdsource.apigateway.dto.ApiError;
-import com.fasterxml.jackson.databind.ObjectMapper;
+import tools.jackson.databind.ObjectMapper;
 import org.springframework.core.io.buffer.DataBuffer;
 import org.springframework.http.HttpStatus;
 import org.springframework.http.MediaType;

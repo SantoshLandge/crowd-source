@@ -1,5 +1,6 @@
 package com.crowdsource.eventservice.controller;
 
+import java.util.UUID;
 import com.crowdsource.eventservice.dto.CreateEvent;
 import com.crowdsource.eventservice.dto.EventResponse;
 import com.crowdsource.eventservice.service.EventService;
@@ -41,7 +42,7 @@ public class EventController {
     }
 
     @GetMapping("/{id}")
-    public EventResponse get(@PathVariable Long id) {
+    public EventResponse get(@PathVariable UUID id) {
         return service.getEvent(id);
     }
 
@@ -57,31 +58,31 @@ public class EventController {
 
     @PutMapping("/{id}")
     @PreAuthorize(ORGANIZER_OR_ADMIN)
-    public EventResponse update(@PathVariable Long id, @Valid @RequestBody CreateEvent request) {
+    public EventResponse update(@PathVariable UUID id, @Valid @RequestBody CreateEvent request) {
         return service.updateEvent(id, request);
     }
 
     @PostMapping("/{id}/submit")
     @PreAuthorize(ORGANIZER_OR_ADMIN)
-    public EventResponse submit(@PathVariable Long id) {
+    public EventResponse submit(@PathVariable UUID id) {
         return service.submit(id);
     }
 
     @PostMapping("/{id}/approve")
     @PreAuthorize("hasRole('ADMIN')")
-    public EventResponse approve(@PathVariable Long id) {
+    public EventResponse approve(@PathVariable UUID id) {
         return service.approve(id);
     }
 
     @PostMapping("/{id}/cancel")
     @PreAuthorize(ORGANIZER_OR_ADMIN)
-    public EventResponse cancel(@PathVariable Long id) {
+    public EventResponse cancel(@PathVariable UUID id) {
         return service.cancel(id);
     }
 
     @DeleteMapping("/{id}")
     @PreAuthorize(ORGANIZER_OR_ADMIN)
-    public ResponseEntity<Void> delete(@PathVariable Long id) {
+    public ResponseEntity<Void> delete(@PathVariable UUID id) {
         service.delete(id);
         return ResponseEntity.noContent().build();
     }
@@ -89,19 +90,19 @@ public class EventController {
     // ---- internal capacity API ---------------------------------------------------
 
     @GetMapping("/{id}/capacity")
-    public ResponseEntity<Integer> capacity(@PathVariable Long id) {
+    public ResponseEntity<Integer> capacity(@PathVariable UUID id) {
         return ResponseEntity.ok(service.availableCapacity(id));
     }
 
     @PostMapping("/{id}/capacity/reserve")
-    public ResponseEntity<Void> reserve(@PathVariable Long id, @RequestParam int quantity) {
+    public ResponseEntity<Void> reserve(@PathVariable UUID id, @RequestParam int quantity) {
         requirePositive(quantity);
         service.reserveCapacity(id, quantity);
         return ResponseEntity.ok().build();
     }
 
     @PostMapping("/{id}/capacity/release")
-    public ResponseEntity<Void> release(@PathVariable Long id, @RequestParam int quantity) {
+    public ResponseEntity<Void> release(@PathVariable UUID id, @RequestParam int quantity) {
         requirePositive(quantity);
         service.releaseCapacity(id, quantity);
         return ResponseEntity.ok().build();

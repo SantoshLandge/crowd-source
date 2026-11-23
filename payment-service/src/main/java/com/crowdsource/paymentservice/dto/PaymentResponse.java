@@ -1,4 +1,5 @@
 package com.crowdsource.paymentservice.dto;
 
-public record PaymentResponse(Long paymentId, String transactionId, String status) {
+import java.util.UUID;
+public record PaymentResponse(UUID paymentId, String transactionId, String status) {
 }

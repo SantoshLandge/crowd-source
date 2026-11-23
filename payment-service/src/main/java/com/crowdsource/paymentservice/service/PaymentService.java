@@ -28,7 +28,7 @@ public class PaymentService {
 
     /** Idempotent per registration: a retry returns the already successful payment instead of charging twice. */
     @Transactional
-    public PaymentResponse processPayment(String registrationId, BigDecimal amount) {
+    public PaymentResponse processPayment(UUID registrationId, BigDecimal amount) {
         Optional<Payment> existing = paymentRepository.findFirstByRegistrationIdOrderByIdDesc(registrationId);
         if (existing.isPresent() && SUCCESS.equals(existing.get().getStatus())) {
             return toResponse(existing.get());
@@ -48,7 +48,7 @@ public class PaymentService {
     }
 
     @Transactional
-    public PaymentResponse processRefund(Long paymentId) {
+    public PaymentResponse processRefund(UUID paymentId) {
         Payment payment = paymentRepository.findById(paymentId)
                 .orElseThrow(() -> new ResponseStatusException(HttpStatus.NOT_FOUND, "Payment not found"));
 

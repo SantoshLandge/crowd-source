@@ -1,5 +1,6 @@
 package com.crowdsource.registrationservice.dto;
 
+import java.util.UUID;
 import com.crowdsource.registrationservice.entity.Registration;
 import com.crowdsource.registrationservice.entity.RegistrationStatus;
 
@@ -7,12 +8,12 @@ import java.math.BigDecimal;
 import java.time.LocalDateTime;
 
 public record RegistrationResponse(
-        Long id,
-        Long eventId,
+        UUID id,
+        UUID eventId,
         Integer quantity,
         BigDecimal totalAmount,
         RegistrationStatus status,
-        Long paymentId,
+        UUID paymentId,
         LocalDateTime createdAt
 ) {
     public static RegistrationResponse from(Registration r) {

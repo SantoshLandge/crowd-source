@@ -1,5 +1,6 @@
 package com.crowdsource.registrationservice.client;
 
+import java.util.UUID;
 import com.crowdsource.registrationservice.dto.EventView;
 import com.crowdsource.registrationservice.exception.RegistrationConflictException;
 import com.crowdsource.registrationservice.exception.RegistrationNotFoundException;
@@ -19,7 +20,7 @@ public class EventClient {
         this.client = builder.clone().baseUrl("http://event-service").build();
     }
 
-    public EventView getEvent(Long eventId) {
+    public EventView getEvent(UUID eventId) {
         try {
             return client.get().uri("/v1/event/{id}", eventId).retrieve().body(EventView.class);
         } catch (HttpClientErrorException.NotFound e) {
@@ -30,7 +31,7 @@ public class EventClient {
     }
 
     /** Atomically reserves seats; 409 from event-service means sold out / not open. */
-    public void reserve(Long eventId, int quantity) {
+    public void reserve(UUID eventId, int quantity) {
         try {
             client.post().uri("/v1/event/{id}/capacity/reserve?quantity={q}", eventId, quantity)
                     .retrieve().toBodilessEntity();
@@ -43,7 +44,7 @@ public class EventClient {
         }
     }
 
-    public void release(Long eventId, int quantity) {
+    public void release(UUID eventId, int quantity) {
         try {
             client.post().uri("/v1/event/{id}/capacity/release?quantity={q}", eventId, quantity)
                     .retrieve().toBodilessEntity();

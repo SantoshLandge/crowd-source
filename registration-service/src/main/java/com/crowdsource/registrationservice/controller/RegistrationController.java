@@ -1,5 +1,6 @@
 package com.crowdsource.registrationservice.controller;
 
+import java.util.UUID;
 import com.crowdsource.registrationservice.dto.RegistrationRequest;
 import com.crowdsource.registrationservice.dto.RegistrationResponse;
 import com.crowdsource.registrationservice.service.RegistrationService;
@@ -32,12 +33,12 @@ public class RegistrationController {
     }
 
     @GetMapping("/{id}")
-    public RegistrationResponse get(@PathVariable Long id) {
+    public RegistrationResponse get(@PathVariable UUID id) {
         return service.get(id);
     }
 
     @PostMapping("/{id}/cancel")
-    public RegistrationResponse cancel(@PathVariable Long id) {
+    public RegistrationResponse cancel(@PathVariable UUID id) {
         return service.cancel(id);
     }
 }

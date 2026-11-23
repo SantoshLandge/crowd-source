@@ -1,5 +1,6 @@
 package com.crowdsource.userservice.repository;
 
+import java.util.UUID;
 import com.crowdsource.userservice.entity.RefreshToken;
 import org.springframework.data.jpa.repository.JpaRepository;
 import org.springframework.data.jpa.repository.Modifying;
@@ -12,7 +13,7 @@ import java.time.LocalDateTime;
 import java.util.Optional;
 
 @Repository
-public interface RefreshTokenRepository extends JpaRepository<RefreshToken, Long> {
+public interface RefreshTokenRepository extends JpaRepository<RefreshToken, UUID> {
 
     Optional<RefreshToken> findByTokenHash(String tokenHash);
 
@@ -20,13 +21,13 @@ public interface RefreshTokenRepository extends JpaRepository<RefreshToken, Long
     @Transactional
     @Modifying(clearAutomatically = true, flushAutomatically = true)
     @Query("update RefreshToken t set t.revoked = true where t.id = :id and t.revoked = false")
-    int revokeIfActive(@Param("id") Long id);
+    int revokeIfActive(@Param("id") UUID id);
 
     /** Logout from all devices / reuse detection / account suspension. */
     @Transactional
     @Modifying(clearAutomatically = true, flushAutomatically = true)
     @Query("update RefreshToken t set t.revoked = true where t.userId = :userId and t.revoked = false")
-    int revokeAllByUserId(@Param("userId") Long userId);
+    int revokeAllByUserId(@Param("userId") UUID userId);
 
     @Transactional
     @Modifying

@@ -1,5 +1,6 @@
 package com.crowdsource.paymentservice.controller;
 
+import java.util.UUID;
 import com.crowdsource.paymentservice.dto.PaymentResponse;
 import com.crowdsource.paymentservice.service.PaymentService;
 import jakarta.validation.constraints.DecimalMin;
@@ -25,7 +26,7 @@ public class PaymentController {
 
     @PostMapping("/process")
     public ResponseEntity<PaymentResponse> processPayment(
-            @RequestParam @NotBlank String registrationId,
+            @RequestParam UUID registrationId,
             @RequestParam @DecimalMin(value = "0.01") BigDecimal amount) {
         PaymentResponse result = paymentService.processPayment(registrationId, amount);
         HttpStatus status = PaymentService.SUCCESS.equals(result.status()) ? HttpStatus.OK : HttpStatus.PAYMENT_REQUIRED;
@@ -33,7 +34,7 @@ public class PaymentController {
     }
 
     @PostMapping("/refund/{paymentId}")
-    public ResponseEntity<PaymentResponse> refund(@PathVariable Long paymentId) {
+    public ResponseEntity<PaymentResponse> refund(@PathVariable UUID paymentId) {
         return ResponseEntity.ok(paymentService.processRefund(paymentId));
     }
 }

@@ -1,7 +1,8 @@
 package com.crowdsource.registrationservice.dto;
 
+import java.util.UUID;
 import com.fasterxml.jackson.annotation.JsonIgnoreProperties;
 
 @JsonIgnoreProperties(ignoreUnknown = true)
-public record EventView(Long id, String title, Integer ticketPrice, String status) {
+public record EventView(UUID id, String title, Integer ticketPrice, String status) {
 }

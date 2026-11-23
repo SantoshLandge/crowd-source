@@ -1,5 +1,6 @@
 package com.crowdsource.eventservice.service;
 
+import java.util.UUID;
 import com.crowdsource.eventservice.dto.CreateEvent;
 import com.crowdsource.eventservice.dto.EventResponse;
 import com.crowdsource.eventservice.entity.Event;
@@ -49,7 +50,7 @@ public class EventService {
 
     /** LIVE events are visible to everybody; other states only to the owner and admins (404 otherwise). */
     @Transactional(readOnly = true)
-    public EventResponse getEvent(Long id) {
+    public EventResponse getEvent(UUID id) {
         Event event = find(id);
         if (event.getStatus() != EventStatus.LIVE && !canManage(event)) {
             throw new EventNotFoundException("Event " + id + " not found");
@@ -82,7 +83,7 @@ public class EventService {
     }
 
     @Transactional
-    public EventResponse updateEvent(Long id, CreateEvent req) {
+    public EventResponse updateEvent(UUID id, CreateEvent req) {
         Event event = findManageable(id);
         if (event.getStatus() != EventStatus.DRAFT) {
             throw new InvalidEventStateException("Only DRAFT events can be edited (current: " + event.getStatus() + ")");
@@ -100,7 +101,7 @@ public class EventService {
     }
 
     @Transactional
-    public EventResponse submit(Long id) {
+    public EventResponse submit(UUID id) {
         Event event = findManageable(id);
         requireStatus(event, EventStatus.DRAFT, "submitted");
         event.setStatus(EventStatus.PENDING);
@@ -109,7 +110,7 @@ public class EventService {
 
     /** Admin only (enforced on the controller). */
     @Transactional
-    public EventResponse approve(Long id) {
+    public EventResponse approve(UUID id) {
         Event event = find(id);
         requireStatus(event, EventStatus.PENDING, "approved");
         event.setStatus(EventStatus.LIVE);
@@ -117,7 +118,7 @@ public class EventService {
     }
 
     @Transactional
-    public EventResponse cancel(Long id) {
+    public EventResponse cancel(UUID id) {
         Event event = findManageable(id);
         if (event.getStatus() == EventStatus.CANCELLED) {
             throw new InvalidEventStateException("Event is already cancelled");
@@ -127,7 +128,7 @@ public class EventService {
     }
 
     @Transactional
-    public void delete(Long id) {
+    public void delete(UUID id) {
         Event event = findManageable(id);
         if (event.getStatus() != EventStatus.DRAFT) {
             throw new InvalidEventStateException("Only DRAFT events can be deleted; cancel the event instead");
@@ -139,13 +140,13 @@ public class EventService {
     // ------------------------------------------------------------------ capacity (internal, called by registration-service)
 
     @Transactional(readOnly = true)
-    public int availableCapacity(Long id) {
+    public int availableCapacity(UUID id) {
         return find(id).getAvailableCapacity();
     }
 
     /** Atomically reserves seats. */
     @Transactional
-    public void reserveCapacity(Long id, int quantity) {
+    public void reserveCapacity(UUID id, int quantity) {
         find(id);   // 404 if unknown
         if (eventRepository.reduceCapacity(id, quantity) == 0) {
             throw new InsufficientCapacityException("Not enough capacity (or event is not open for registration)");
@@ -154,7 +155,7 @@ public class EventService {
     }
 
     @Transactional
-    public void releaseCapacity(Long id, int quantity) {
+    public void releaseCapacity(UUID id, int quantity) {
         find(id);
         if (eventRepository.increaseCapacity(id, quantity) == 0) {
             throw new InvalidEventStateException("Cannot release " + quantity + " seats: would exceed total capacity");
@@ -164,12 +165,12 @@ public class EventService {
 
     // ------------------------------------------------------------------ helpers
 
-    private Event find(Long id) {
+    private Event find(UUID id) {
         return eventRepository.findById(id)
                 .orElseThrow(() -> new EventNotFoundException("Event " + id + " not found"));
     }
 
-    private Event findManageable(Long id) {
+    private Event findManageable(UUID id) {
         Event event = find(id);
         if (!canManage(event)) {
             throw new AccessDeniedException("You do not own this event");
@@ -197,10 +198,10 @@ public class EventService {
     }
 
     /** The principal is the user id (String) provided by the signed gateway headers. */
-    private Long currentUserId() {
+    private UUID currentUserId() {
         try {
-            return Long.valueOf(auth().getName());
-        } catch (NumberFormatException e) {
+            return UUID.fromString(auth().getName());
+        } catch (IllegalArgumentException e) {
             throw new AccessDeniedException("Invalid user identity");
         }
     }

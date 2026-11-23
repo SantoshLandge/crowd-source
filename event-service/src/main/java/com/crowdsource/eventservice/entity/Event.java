@@ -1,5 +1,7 @@
 package com.crowdsource.eventservice.entity;
 
+import java.util.UUID;
+import org.hibernate.annotations.UuidGenerator;
 import com.crowdsource.eventservice.entity.type.EventStatus;
 import com.crowdsource.eventservice.entity.type.EventType;
 import jakarta.persistence.*;
@@ -26,8 +28,9 @@ import java.time.LocalDateTime;
 @AllArgsConstructor
 public class Event {
     @Id
-    @GeneratedValue(strategy = GenerationType.IDENTITY)
-    private Long id;
+    @UuidGenerator(style = UuidGenerator.Style.VERSION_7)
+    @Column(updatable = false, nullable = false)
+    private UUID id;
 
     @Column(unique = true, nullable = false)
     private String title;
@@ -59,7 +62,7 @@ public class Event {
 
     /** Id of the user (from the gateway identity) that owns the event; used for ownership checks. */
     @Column(nullable = false, updatable = false)
-    private Long organizerId;
+    private UUID organizerId;
 
     @Version
     private Integer version;

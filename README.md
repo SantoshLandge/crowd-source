@@ -1,5 +1,8 @@
 # Crowd-source backend
 
+Stack: Spring Boot 4.1.3 (Spring Framework 7, Spring Security 7, Hibernate 7, Jackson 3), Spring Cloud 2025.1.3 (Oakwood), Java 21.
+All entity ids are UUID v7 (`@UuidGenerator(style = VERSION_7)`), including the `userId` JWT claim and the gateway identity headers.
+
 | Module | Port | Role |
 |---|---|---|
 | eureka-server | 8761 | service discovery |
@@ -34,9 +37,10 @@ cd api-gateway && ./mvnw spring-boot:run
 ```
 curl -i -c jar -H 'Content-Type: application/json' -d '{"username":"organizer@crowdsource.com","password":"organizer"}' localhost:8001/api/auth/v1/login
 curl -b jar -H 'Content-Type: application/json' -d '{"title":"Meetup","eventDate":"2030-01-01T18:00:00","totalCapacity":50,"ticketPrice":10}' localhost:8001/api/v1/event
-curl -b jar -X POST localhost:8001/api/v1/event/1/submit
-# log in as admin (new jar), then: POST /api/v1/event/1/approve
-# log in as user: POST /api/v1/registration {"eventId":1,"quantity":2}
+# the create response contains the event "id" (UUID); use it below
+curl -b jar -X POST localhost:8001/api/v1/event/<event-id>/submit
+# log in as admin (new jar), then: POST /api/v1/event/<event-id>/approve
+# log in as user: POST /api/v1/registration {"eventId":"<event-id>","quantity":2}
 # spoof test (must be 401): curl -H 'X-User-Id: 3' -H 'X-User-Authorities: ROLE_ADMIN' localhost:8003/v1/event
 ```
 

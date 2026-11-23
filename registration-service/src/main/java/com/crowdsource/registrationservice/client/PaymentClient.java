@@ -1,5 +1,6 @@
 package com.crowdsource.registrationservice.client;
 
+import java.util.UUID;
 import com.crowdsource.registrationservice.dto.PaymentResult;
 import com.crowdsource.registrationservice.exception.UpstreamServiceException;
 import org.springframework.cloud.client.loadbalancer.LoadBalanced;
@@ -20,7 +21,7 @@ public class PaymentClient {
     }
 
     /** Idempotent per registrationId on the payment side. HTTP 402 is a normal "payment declined" result. */
-    public PaymentResult process(String registrationId, BigDecimal amount) {
+    public PaymentResult process(UUID registrationId, BigDecimal amount) {
         try {
             return client.post()
                     .uri("/v1/payments/process?registrationId={r}&amount={a}", registrationId, amount.toPlainString())
@@ -35,7 +36,7 @@ public class PaymentClient {
         }
     }
 
-    public void refund(Long paymentId) {
+    public void refund(UUID paymentId) {
         try {
             client.post().uri("/v1/payments/refund/{id}", paymentId).retrieve().toBodilessEntity();
         } catch (RestClientException e) {

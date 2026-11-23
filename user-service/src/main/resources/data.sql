@@ -1,49 +1,49 @@
 -- =====================================================
--- ROLES
+-- ROLES (fixed UUIDs so role_permissions can reference them; entity ids are UUID v7)
 -- =====================================================
-INSERT INTO roles (id, name) VALUES (1, 'USER');
-INSERT INTO roles (id, name) VALUES (2, 'ORGANIZER');
-INSERT INTO roles (id, name) VALUES (3, 'ADMIN');
+INSERT INTO roles (id, name) VALUES ('01980000-0001-7000-8000-000000000001', 'USER');
+INSERT INTO roles (id, name) VALUES ('01980000-0001-7000-8000-000000000002', 'ORGANIZER');
+INSERT INTO roles (id, name) VALUES ('01980000-0001-7000-8000-000000000003', 'ADMIN');
 
 -- =====================================================
 -- PERMISSIONS
 -- =====================================================
-INSERT INTO permissions (id, name, resource, action) VALUES (1, 'create:user', 'user', 'create');
-INSERT INTO permissions (id, name, resource, action) VALUES (2, 'update:user', 'user', 'update');
-INSERT INTO permissions (id, name, resource, action) VALUES (3, 'delete:user', 'user', 'delete');
-INSERT INTO permissions (id, name, resource, action) VALUES (4, 'read:user', 'user', 'read');
-INSERT INTO permissions (id, name, resource, action) VALUES (5, 'manage:users', 'users', 'manage');
-INSERT INTO permissions (id, name, resource, action) VALUES (6, 'create:event', 'event', 'create');
-INSERT INTO permissions (id, name, resource, action) VALUES (7, 'update:event', 'event', 'update');
-INSERT INTO permissions (id, name, resource, action) VALUES (8, 'delete:event', 'event', 'delete');
-INSERT INTO permissions (id, name, resource, action) VALUES (9, 'read:event', 'event', 'read');
-INSERT INTO permissions (id, name, resource, action) VALUES (10, 'manage:events', 'events', 'manage');
+INSERT INTO permissions (id, name, resource, action) VALUES ('01980000-0002-7000-8000-000000000001', 'create:user', 'user', 'create');
+INSERT INTO permissions (id, name, resource, action) VALUES ('01980000-0002-7000-8000-000000000002', 'update:user', 'user', 'update');
+INSERT INTO permissions (id, name, resource, action) VALUES ('01980000-0002-7000-8000-000000000003', 'delete:user', 'user', 'delete');
+INSERT INTO permissions (id, name, resource, action) VALUES ('01980000-0002-7000-8000-000000000004', 'read:user', 'user', 'read');
+INSERT INTO permissions (id, name, resource, action) VALUES ('01980000-0002-7000-8000-000000000005', 'manage:users', 'users', 'manage');
+INSERT INTO permissions (id, name, resource, action) VALUES ('01980000-0002-7000-8000-000000000006', 'create:event', 'event', 'create');
+INSERT INTO permissions (id, name, resource, action) VALUES ('01980000-0002-7000-8000-000000000007', 'update:event', 'event', 'update');
+INSERT INTO permissions (id, name, resource, action) VALUES ('01980000-0002-7000-8000-000000000008', 'delete:event', 'event', 'delete');
+INSERT INTO permissions (id, name, resource, action) VALUES ('01980000-0002-7000-8000-000000000009', 'read:event', 'event', 'read');
+INSERT INTO permissions (id, name, resource, action) VALUES ('01980000-0002-7000-8000-00000000000a', 'manage:events', 'events', 'manage');
 
 -- =====================================================
 -- ROLE PERMISSIONS
 -- =====================================================
 -- USER: own profile + read events
-INSERT INTO role_permissions (role_id, permission_id) VALUES (1, 1);
-INSERT INTO role_permissions (role_id, permission_id) VALUES (1, 2);
-INSERT INTO role_permissions (role_id, permission_id) VALUES (1, 4);
-INSERT INTO role_permissions (role_id, permission_id) VALUES (1, 9);
+INSERT INTO role_permissions (role_id, permission_id) VALUES ('01980000-0001-7000-8000-000000000001', '01980000-0002-7000-8000-000000000001');
+INSERT INTO role_permissions (role_id, permission_id) VALUES ('01980000-0001-7000-8000-000000000001', '01980000-0002-7000-8000-000000000002');
+INSERT INTO role_permissions (role_id, permission_id) VALUES ('01980000-0001-7000-8000-000000000001', '01980000-0002-7000-8000-000000000004');
+INSERT INTO role_permissions (role_id, permission_id) VALUES ('01980000-0001-7000-8000-000000000001', '01980000-0002-7000-8000-000000000009');
 
 -- ORGANIZER: event management
-INSERT INTO role_permissions (role_id, permission_id) VALUES (2, 6);
-INSERT INTO role_permissions (role_id, permission_id) VALUES (2, 7);
-INSERT INTO role_permissions (role_id, permission_id) VALUES (2, 9);
-INSERT INTO role_permissions (role_id, permission_id) VALUES (2, 4);
+INSERT INTO role_permissions (role_id, permission_id) VALUES ('01980000-0001-7000-8000-000000000002', '01980000-0002-7000-8000-000000000006');
+INSERT INTO role_permissions (role_id, permission_id) VALUES ('01980000-0001-7000-8000-000000000002', '01980000-0002-7000-8000-000000000007');
+INSERT INTO role_permissions (role_id, permission_id) VALUES ('01980000-0001-7000-8000-000000000002', '01980000-0002-7000-8000-000000000009');
+INSERT INTO role_permissions (role_id, permission_id) VALUES ('01980000-0001-7000-8000-000000000002', '01980000-0002-7000-8000-000000000004');
 
 -- ADMIN: everything (previously only manage:*, so read:user / update:user based checks failed for admins)
-INSERT INTO role_permissions (role_id, permission_id) VALUES (3, 1);
-INSERT INTO role_permissions (role_id, permission_id) VALUES (3, 2);
-INSERT INTO role_permissions (role_id, permission_id) VALUES (3, 3);
-INSERT INTO role_permissions (role_id, permission_id) VALUES (3, 4);
-INSERT INTO role_permissions (role_id, permission_id) VALUES (3, 5);
-INSERT INTO role_permissions (role_id, permission_id) VALUES (3, 6);
-INSERT INTO role_permissions (role_id, permission_id) VALUES (3, 7);
-INSERT INTO role_permissions (role_id, permission_id) VALUES (3, 8);
-INSERT INTO role_permissions (role_id, permission_id) VALUES (3, 9);
-INSERT INTO role_permissions (role_id, permission_id) VALUES (3, 10);
+INSERT INTO role_permissions (role_id, permission_id) VALUES ('01980000-0001-7000-8000-000000000003', '01980000-0002-7000-8000-000000000001');
+INSERT INTO role_permissions (role_id, permission_id) VALUES ('01980000-0001-7000-8000-000000000003', '01980000-0002-7000-8000-000000000002');
+INSERT INTO role_permissions (role_id, permission_id) VALUES ('01980000-0001-7000-8000-000000000003', '01980000-0002-7000-8000-000000000003');
+INSERT INTO role_permissions (role_id, permission_id) VALUES ('01980000-0001-7000-8000-000000000003', '01980000-0002-7000-8000-000000000004');
+INSERT INTO role_permissions (role_id, permission_id) VALUES ('01980000-0001-7000-8000-000000000003', '01980000-0002-7000-8000-000000000005');
+INSERT INTO role_permissions (role_id, permission_id) VALUES ('01980000-0001-7000-8000-000000000003', '01980000-0002-7000-8000-000000000006');
+INSERT INTO role_permissions (role_id, permission_id) VALUES ('01980000-0001-7000-8000-000000000003', '01980000-0002-7000-8000-000000000007');
+INSERT INTO role_permissions (role_id, permission_id) VALUES ('01980000-0001-7000-8000-000000000003', '01980000-0002-7000-8000-000000000008');
+INSERT INTO role_permissions (role_id, permission_id) VALUES ('01980000-0001-7000-8000-000000000003', '01980000-0002-7000-8000-000000000009');
+INSERT INTO role_permissions (role_id, permission_id) VALUES ('01980000-0001-7000-8000-000000000003', '01980000-0002-7000-8000-00000000000a');
 
 -- Demo users are created (with BCrypt hashes) by DevDataSeeder in non-prod profiles.

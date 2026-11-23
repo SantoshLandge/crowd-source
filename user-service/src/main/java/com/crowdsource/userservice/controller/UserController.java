@@ -1,5 +1,6 @@
 package com.crowdsource.userservice.controller;
 
+import java.util.UUID;
 import com.crowdsource.userservice.dto.LoginRequest;
 import com.crowdsource.userservice.dto.SignupRequest;
 import com.crowdsource.userservice.dto.UpdateProfileRequest;
@@ -71,7 +72,7 @@ public class UserController {
     }
 
     /** The principal is the user id (String) set by the gateway header filter. */
-    private Long currentUserId(Authentication authentication) {
-        return Long.valueOf(authentication.getName());
+    private UUID currentUserId(Authentication authentication) {
+        return UUID.fromString(authentication.getName());
     }
 }

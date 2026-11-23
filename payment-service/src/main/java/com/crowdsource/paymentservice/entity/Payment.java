@@ -1,5 +1,7 @@
 package com.crowdsource.paymentservice.entity;
 
+import java.util.UUID;
+import org.hibernate.annotations.UuidGenerator;
 import jakarta.persistence.*;
 import lombok.Data;
 
@@ -11,10 +13,11 @@ import java.time.LocalDateTime;
 @Table(name = "payments")
 public class Payment {
     @Id
-    @GeneratedValue(strategy = GenerationType.IDENTITY)
-    private Long id;
+    @UuidGenerator(style = UuidGenerator.Style.VERSION_7)
+    @Column(updatable = false, nullable = false)
+    private UUID id;
 
-    private String registrationId;
+    private UUID registrationId;
     private BigDecimal amount;
     private String status; // PENDING, SUCCESS, FAILED, REFUNDED
     private String transactionId;

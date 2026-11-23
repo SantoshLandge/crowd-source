@@ -1,11 +1,12 @@
 package com.crowdsource.userservice.dto;
 
+import java.util.UUID;
 import com.crowdsource.userservice.entity.enums.UserStatus;
 import java.time.LocalDateTime;
 import java.util.Set;
 
 public record UserResponseDto(
-        Long id,
+        UUID id,
         String email,
         String displayName,
         UserStatus status,

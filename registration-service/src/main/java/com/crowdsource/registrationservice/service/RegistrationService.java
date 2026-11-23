@@ -1,5 +1,6 @@
 package com.crowdsource.registrationservice.service;
 
+import java.util.UUID;
 import com.crowdsource.registrationservice.client.EventClient;
 import com.crowdsource.registrationservice.client.PaymentClient;
 import com.crowdsource.registrationservice.dto.EventView;
@@ -37,7 +38,7 @@ public class RegistrationService {
     private final PaymentClient paymentClient;
 
     public RegistrationResponse register(RegistrationRequest request) {
-        Long userId = currentUserId();
+        UUID userId = currentUserId();
         int quantity = request.quantity();
 
         EventView event = eventClient.getEvent(request.eventId());   // price comes from the server, never from the client
@@ -64,7 +65,7 @@ public class RegistrationService {
         if (total.signum() > 0) {
             PaymentResult payment;
             try {
-                payment = paymentClient.process(String.valueOf(registration.getId()), total);
+                payment = paymentClient.process(registration.getId(), total);
             } catch (RuntimeException e) {
                 // Payment is idempotent per registration id, so an ambiguous failure can be reconciled/retried
                 compensate(registration);
@@ -88,11 +89,11 @@ public class RegistrationService {
                 .map(RegistrationResponse::from).toList();
     }
 
-    public RegistrationResponse get(Long id) {
+    public RegistrationResponse get(UUID id) {
         return RegistrationResponse.from(findAccessible(id));
     }
 
-    public RegistrationResponse cancel(Long id) {
+    public RegistrationResponse cancel(UUID id) {
         Registration registration = findAccessible(id);
         if (registration.getStatus() != RegistrationStatus.CONFIRMED) {
             throw new RegistrationConflictException("Only CONFIRMED registrations can be cancelled");
@@ -123,7 +124,7 @@ public class RegistrationService {
     }
 
     /** Owner or admin; everybody else gets a 404 so ids cannot be probed. */
-    private Registration findAccessible(Long id) {
+    private Registration findAccessible(UUID id) {
         Registration registration = repository.findById(id)
                 .orElseThrow(() -> new RegistrationNotFoundException("Registration " + id + " not found"));
         if (!registration.getUserId().equals(currentUserId()) && !isAdmin()) {
@@ -140,10 +141,10 @@ public class RegistrationService {
         return auth;
     }
 
-    private Long currentUserId() {
+    private UUID currentUserId() {
         try {
-            return Long.valueOf(auth().getName());
-        } catch (NumberFormatException e) {
+            return UUID.fromString(auth().getName());
+        } catch (IllegalArgumentException e) {
             throw new AccessDeniedException("Invalid user identity");
         }
     }

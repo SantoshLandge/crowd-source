@@ -1,5 +1,6 @@
 package com.crowdsource.userservice.security;
 
+import java.util.UUID;
 import com.crowdsource.userservice.entity.User;
 import lombok.AllArgsConstructor;
 import lombok.Data;
@@ -15,7 +16,7 @@ import java.util.stream.Collectors;
 @AllArgsConstructor
 public class CustomUserDetails implements UserDetails {
 
-    private final Long id;
+    private final UUID id;
     private final String username;  // EMAIL (login identifier)
     private final String password;
     private final boolean enabled;
@@ -31,7 +32,7 @@ public class CustomUserDetails implements UserDetails {
     }
 
     // From JWT claims
-    public CustomUserDetails(Long id, String email, String password,
+    public CustomUserDetails(UUID id, String email, String password,
                              List<String> authorityStrings, boolean enabled) {
         this.id = id;
         this.username = email;  // Email

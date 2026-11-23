@@ -1,5 +1,6 @@
 package com.crowdsource.userservice.service;
 
+import java.util.UUID;
 import com.crowdsource.userservice.entity.User;
 import com.crowdsource.userservice.repository.UserRepository;
 import com.crowdsource.userservice.security.CustomUserDetails;
@@ -27,7 +28,7 @@ public class CustomUserDetailsService implements UserDetailsService {
     }
 
     @Transactional(readOnly = true)
-    public CustomUserDetails loadUserByUserId(Long userId) {
+    public CustomUserDetails loadUserByUserId(UUID userId) {
         User user = userRepository.findById(userId)
                 .orElseThrow(() -> new UsernameNotFoundException("User not found: " + userId));
         return new CustomUserDetails(user);

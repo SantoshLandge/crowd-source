@@ -1,5 +1,6 @@
 package com.crowdsource.eventservice.entity;
 
+import java.util.UUID;
 import jakarta.persistence.Entity;
 import jakarta.persistence.Id;
 import jakarta.persistence.Table;
@@ -19,7 +20,7 @@ import org.hibernate.type.SqlTypes;
 public class EventDetails {
 
     @Id
-    private Long eventId;  // Matches Event.id
+    private UUID eventId;  // shares the primary key of its Event (assigned, not generated)
 
     private String imageUrl;
 

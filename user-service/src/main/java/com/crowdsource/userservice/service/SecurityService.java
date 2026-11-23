@@ -1,5 +1,6 @@
 package com.crowdsource.userservice.service;
 
+import java.util.UUID;
 import org.springframework.security.core.Authentication;
 import org.springframework.stereotype.Component;
 
@@ -10,7 +11,7 @@ import org.springframework.stereotype.Component;
 @Component("securityService")
 public class SecurityService {
 
-    public boolean isOwner(Authentication authentication, Long targetUserId) {
+    public boolean isOwner(Authentication authentication, UUID targetUserId) {
         if (authentication == null || !authentication.isAuthenticated() || targetUserId == null) {
             return false;
         }

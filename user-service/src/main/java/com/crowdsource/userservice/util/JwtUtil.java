@@ -2,7 +2,13 @@ package com.crowdsource.userservice.util;
 
 import com.crowdsource.userservice.dto.AuthResponse;
 import com.crowdsource.userservice.security.CustomUserDetails;
-import io.jsonwebtoken.Jwts;
+import com.nimbusds.jose.JOSEException;
+import com.nimbusds.jose.JOSEObjectType;
+import com.nimbusds.jose.JWSAlgorithm;
+import com.nimbusds.jose.JWSHeader;
+import com.nimbusds.jose.crypto.ECDSASigner;
+import com.nimbusds.jwt.JWTClaimsSet;
+import com.nimbusds.jwt.SignedJWT;
 import lombok.extern.slf4j.Slf4j;
 import org.springframework.beans.factory.annotation.Autowired;
 import org.springframework.beans.factory.annotation.Value;
@@ -13,7 +19,7 @@ import org.springframework.http.ResponseEntity;
 import org.springframework.security.core.GrantedAuthority;
 import org.springframework.stereotype.Component;
 
-import java.security.PrivateKey;
+import java.security.interfaces.ECPrivateKey;
 import java.time.Duration;
 import java.util.Date;
 import java.util.Map;
@@ -32,7 +38,7 @@ public class JwtUtil {
     /** Key id published in the JWKS endpoint (JwksController) and set in every token header. */
     public static final String KEY_ID = "auth-key-1";
 
-    private final PrivateKey privateKey;
+    private final ECPrivateKey privateKey;
     private final String issuer;
     private final boolean cookieSecure;
     private final String sameSite;
@@ -44,7 +50,7 @@ public class JwtUtil {
                    @Value("${app.security.cookie-secure:false}") boolean cookieSecure,
                    @Value("${app.security.cookie-same-site:Lax}") String sameSite,
                    @Value("${app.security.refresh-cookie-path:/api/auth/v1}") String refreshCookiePath) {
-        this.privateKey = pemKeyLoader.getPrivateKey();
+        this.privateKey = (ECPrivateKey) pemKeyLoader.getPrivateKey();   // PemKeyLoader guarantees an EC P-256 key
         this.issuer = issuer;
         this.cookieSecure = cookieSecure;
         this.sameSite = sameSite;
@@ -52,23 +58,35 @@ public class JwtUtil {
         log.debug("JwtUtil initialized (ES256, issuer={}, secureCookies={})", issuer, cookieSecure);
     }
 
+    /**
+     * ES256-signed access token. Signed with Nimbus (already on the classpath for the JWKS endpoint), which also
+     * keeps this service free of a second JSON stack (JJWT needed Jackson 2, Boot 4 uses Jackson 3).
+     */
     public String generateAccessToken(CustomUserDetails userDetails) {
         long now = System.currentTimeMillis();
-        return Jwts.builder()
-                .header()
-                .keyId(KEY_ID)
-                .and()
+        JWTClaimsSet claims = new JWTClaimsSet.Builder()
                 .issuer(issuer)
-                .id(UUID.randomUUID().toString())
+                .jwtID(UUID.randomUUID().toString())
                 .subject(userDetails.getUsername())
-                .claim("userId", userDetails.getId())
+                .claim("userId", userDetails.getId().toString())          // UUID as string
                 .claim("username", userDetails.getUsername())
                 .claim("authorities", userDetails.getAuthorities().stream()
                         .map(GrantedAuthority::getAuthority).toList())
-                .issuedAt(new Date(now))
-                .expiration(new Date(now + ACCESS_TOKEN_TTL.toMillis()))
-                .signWith(privateKey, Jwts.SIG.ES256)
-                .compact();
+                .issueTime(new Date(now))
+                .expirationTime(new Date(now + ACCESS_TOKEN_TTL.toMillis()))
+                .build();
+
+        JWSHeader header = new JWSHeader.Builder(JWSAlgorithm.ES256)
+                .keyID(KEY_ID)
+                .type(JOSEObjectType.JWT)
+                .build();
+        try {
+            SignedJWT jwt = new SignedJWT(header, claims);
+            jwt.sign(new ECDSASigner(privateKey));
+            return jwt.serialize();
+        } catch (JOSEException e) {
+            throw new IllegalStateException("Unable to sign access token", e);
+        }
     }
 
     /** Sets the access + refresh cookies (HttpOnly) and returns the profile metadata as JSON body. */

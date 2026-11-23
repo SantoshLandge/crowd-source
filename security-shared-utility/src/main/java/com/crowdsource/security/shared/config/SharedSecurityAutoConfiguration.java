@@ -5,8 +5,6 @@ import com.crowdsource.security.shared.handler.SharedSecurityExceptionHandler;
 import org.springframework.boot.autoconfigure.AutoConfiguration;
 import org.springframework.boot.autoconfigure.condition.ConditionalOnMissingBean;
 import org.springframework.boot.autoconfigure.condition.ConditionalOnWebApplication;
-import org.springframework.boot.autoconfigure.security.servlet.SecurityAutoConfiguration;
-import org.springframework.boot.autoconfigure.security.servlet.UserDetailsServiceAutoConfiguration;
 import org.springframework.boot.context.properties.EnableConfigurationProperties;
 import org.springframework.context.annotation.Bean;
 import org.springframework.core.env.Environment;
@@ -16,9 +14,11 @@ import org.springframework.security.config.annotation.web.configuration.EnableWe
 import org.springframework.security.config.annotation.web.configurers.AbstractHttpConfigurer;
 import org.springframework.security.config.annotation.web.configurers.HeadersConfigurer;
 import org.springframework.security.config.http.SessionCreationPolicy;
+import org.springframework.security.core.userdetails.UserDetailsService;
+import org.springframework.security.core.userdetails.UsernameNotFoundException;
 import org.springframework.security.web.SecurityFilterChain;
 import org.springframework.security.web.authentication.UsernamePasswordAuthenticationFilter;
-import org.springframework.security.web.util.matcher.AntPathRequestMatcher;
+import org.springframework.security.web.servlet.util.matcher.PathPatternRequestMatcher;
 import org.springframework.security.web.util.matcher.RequestMatcher;
 import org.springframework.util.StringUtils;
 
@@ -36,9 +36,15 @@ import java.util.List;
  * </ul>
  * A service can replace the whole chain by declaring its own {@link SecurityFilterChain} bean.
  */
-@AutoConfiguration(before = {
-        SecurityAutoConfiguration.class,
-        UserDetailsServiceAutoConfiguration.class
+// String names (not classes): Boot 4 moved the security auto-configurations into spring-boot-security; listing both the
+// old and the new locations keeps the ordering correct without a compile-time dependency on either.
+@AutoConfiguration(beforeName = {
+        "org.springframework.boot.security.autoconfigure.SecurityAutoConfiguration",
+        "org.springframework.boot.security.autoconfigure.UserDetailsServiceAutoConfiguration",
+        "org.springframework.boot.security.autoconfigure.servlet.ServletWebSecurityAutoConfiguration",
+        "org.springframework.boot.security.autoconfigure.web.servlet.ServletWebSecurityAutoConfiguration",
+        "org.springframework.boot.autoconfigure.security.servlet.SecurityAutoConfiguration",
+        "org.springframework.boot.autoconfigure.security.servlet.UserDetailsServiceAutoConfiguration"
 })
 @ConditionalOnWebApplication(type = ConditionalOnWebApplication.Type.SERVLET)
 @EnableConfigurationProperties(SharedSecurityProperties.class)
@@ -54,9 +60,22 @@ public class SharedSecurityAutoConfiguration {
         return new SharedSecurityExceptionHandler();
     }
 
+    /**
+     * Services behind the gateway have no username/password login. Declaring a UserDetailsService stops Spring Boot's
+     * UserDetailsServiceAutoConfiguration from creating its default in-memory user ("Using generated security
+     * password"). It never authenticates anybody. Services that really need one (user-service) define their own bean,
+     * and this one backs off.
+     */
+    @Bean
+    @ConditionalOnMissingBean(UserDetailsService.class)
+    public UserDetailsService denyAllUserDetailsService() {
+        return username -> {
+            throw new UsernameNotFoundException("Password login is not supported by this service");
+        };
+    }
+
     @Bean
     @ConditionalOnMissingBean(SecurityFilterChain.class)
-    @SuppressWarnings("deprecation")
     public SecurityFilterChain sharedSecurityFilterChain(HttpSecurity http,
                                                          SharedSecurityProperties properties,
                                                          SharedSecurityExceptionHandler exceptionHandler,
@@ -80,9 +99,11 @@ public class SharedSecurityAutoConfiguration {
             publicPaths.add(environment.getProperty("spring.h2.console.path", "/h2-console") + "/**");
         }
 
-        // Plain ant matchers: avoids MVC-matcher ambiguity when extra servlets (H2 console) are registered.
+        // Spring Security 7 removed AntPathRequestMatcher / MvcRequestMatcher; PathPatternRequestMatcher is the replacement
+        // (and avoids the MVC-matcher ambiguity when extra servlets such as the H2 console are registered).
+        PathPatternRequestMatcher.Builder matchers = PathPatternRequestMatcher.withDefaults();
         RequestMatcher[] publicMatchers = publicPaths.stream()
-                .map(AntPathRequestMatcher::new)
+                .<RequestMatcher>map(matchers::matcher)
                 .toArray(RequestMatcher[]::new);
 
         http

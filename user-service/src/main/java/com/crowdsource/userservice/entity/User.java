@@ -1,5 +1,7 @@
 package com.crowdsource.userservice.entity;
 
+import java.util.UUID;
+import org.hibernate.annotations.UuidGenerator;
 import com.crowdsource.userservice.entity.enums.UserStatus;
 import jakarta.persistence.*;
 import jakarta.validation.constraints.Email;
@@ -35,8 +37,9 @@ public class User {
 
     @Id
     @EqualsAndHashCode.Include
-    @GeneratedValue(strategy = GenerationType.IDENTITY)
-    private Long id;
+    @UuidGenerator(style = UuidGenerator.Style.VERSION_7)
+    @Column(updatable = false, nullable = false)
+    private UUID id;
 
     @Email
     @NotBlank

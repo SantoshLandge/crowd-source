@@ -1,9 +1,7 @@
 package com.crowdsource.security.shared.handler;
 
 import com.crowdsource.security.shared.dto.SecurityErrorResponse;
-import com.fasterxml.jackson.databind.ObjectMapper;
-import com.fasterxml.jackson.databind.SerializationFeature;
-import com.fasterxml.jackson.datatype.jsr310.JavaTimeModule;
+import tools.jackson.databind.json.JsonMapper;
 import jakarta.servlet.http.HttpServletRequest;
 import jakarta.servlet.http.HttpServletResponse;
 import org.slf4j.Logger;
@@ -31,9 +29,8 @@ public class SharedSecurityExceptionHandler implements AccessDeniedHandler, Auth
 
     private static final Logger log = LoggerFactory.getLogger(SharedSecurityExceptionHandler.class);
 
-    private final ObjectMapper objectMapper = new ObjectMapper()
-            .registerModule(new JavaTimeModule())
-            .disable(SerializationFeature.WRITE_DATES_AS_TIMESTAMPS);
+    // Jackson 3: java.time support is built in and dates are written as ISO-8601 strings by default
+    private final JsonMapper objectMapper = JsonMapper.builder().build();
 
     // 401 - no (valid) identity
     @Override

@@ -1,5 +1,6 @@
 package com.crowdsource.userservice.service;
 
+import java.util.UUID;
 import com.crowdsource.userservice.dto.*;
 import com.crowdsource.userservice.entity.RefreshToken;
 import com.crowdsource.userservice.entity.Role;
@@ -141,7 +142,7 @@ public class UserService {
     }
 
     @Transactional
-    public ResponseEntity<?> logoutAllDevices(Long userId) {
+    public ResponseEntity<?> logoutAllDevices(UUID userId) {
         int revoked = refreshTokenRepo.revokeAllByUserId(userId);
         log.info("Logout from all devices for user {} ({} sessions revoked)", userId, revoked);
         return jwtUtil.createLogoutResponse("Logged out from all devices");
@@ -150,7 +151,7 @@ public class UserService {
     // ------------------------------------------------------------------ profile / admin
 
     @Transactional(readOnly = true)
-    public UserResponse getCurrentUser(Long userId) {
+    public UserResponse getCurrentUser(UUID userId) {
         User user = findUser(userId);
         return UserResponse.builder()
                 .id(user.getId())
@@ -161,7 +162,7 @@ public class UserService {
     }
 
     @Transactional
-    public UserResponse updateProfile(Long userId, UpdateProfileRequest request) {
+    public UserResponse updateProfile(UUID userId, UpdateProfileRequest request) {
         User user = findUser(userId);
         user.setDisplayName(request.getDisplayName().trim());
         return getCurrentUser(userRepository.save(user).getId());
@@ -183,7 +184,7 @@ public class UserService {
 
     /** Admin: activate / suspend an account. Anything other than ACTIVE kills all existing sessions. */
     @Transactional
-    public UserResponseDto updateUserStatus(Long actingAdminId, Long targetUserId, UserStatus status) {
+    public UserResponseDto updateUserStatus(UUID actingAdminId, UUID targetUserId, UserStatus status) {
         if (actingAdminId.equals(targetUserId)) {
             throw new IllegalStateException("You cannot change the status of your own account");
         }
@@ -213,7 +214,7 @@ public class UserService {
     }
 
     /** Generates + persists a new refresh token; returns the RAW value (only its hash is stored). */
-    public String generateNewRefreshToken(Long userId) {
+    public String generateNewRefreshToken(UUID userId) {
         byte[] random = new byte[48];
         SECURE_RANDOM.nextBytes(random);
         String rawToken = Base64.getUrlEncoder().withoutPadding().encodeToString(random);
@@ -235,7 +236,7 @@ public class UserService {
         return header != null && !header.isBlank() ? header : null;
     }
 
-    private User findUser(Long userId) {
+    private User findUser(UUID userId) {
         return userRepository.findById(userId)
                 .orElseThrow(() -> new ResourceNotFoundException("User not found"));
     }

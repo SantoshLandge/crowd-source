@@ -1,5 +1,7 @@
 package com.crowdsource.registrationservice.entity;
 
+import java.util.UUID;
+import org.hibernate.annotations.UuidGenerator;
 import jakarta.persistence.*;
 import lombok.AllArgsConstructor;
 import lombok.Builder;
@@ -21,14 +23,15 @@ import java.time.LocalDateTime;
 public class Registration {
 
     @Id
-    @GeneratedValue(strategy = GenerationType.IDENTITY)
-    private Long id;
+    @UuidGenerator(style = UuidGenerator.Style.VERSION_7)
+    @Column(updatable = false, nullable = false)
+    private UUID id;
 
     @Column(name = "user_id", nullable = false, updatable = false)
-    private Long userId;
+    private UUID userId;
 
     @Column(name = "event_id", nullable = false, updatable = false)
-    private Long eventId;
+    private UUID eventId;
 
     @Column(nullable = false, updatable = false)
     private Integer quantity;
@@ -41,7 +44,7 @@ public class Registration {
     private RegistrationStatus status;
 
     @Column(name = "payment_id")
-    private Long paymentId;
+    private UUID paymentId;
 
     @CreationTimestamp
     @Column(name = "created_at", nullable = false, updatable = false)

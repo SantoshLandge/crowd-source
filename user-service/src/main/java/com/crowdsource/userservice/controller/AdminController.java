@@ -1,5 +1,6 @@
 package com.crowdsource.userservice.controller;
 
+import java.util.UUID;
 import com.crowdsource.userservice.dto.UpdateUserStatusRequest;
 import com.crowdsource.userservice.dto.UserResponseDto;
 import com.crowdsource.userservice.service.UserService;
@@ -31,10 +32,10 @@ public class AdminController {
     }
 
     @PatchMapping("/users/{id}/status")
-    public ResponseEntity<UserResponseDto> updateUserStatus(@PathVariable Long id,
+    public ResponseEntity<UserResponseDto> updateUserStatus(@PathVariable UUID id,
                                                             @Valid @RequestBody UpdateUserStatusRequest request,
                                                             Authentication authentication) {
-        Long adminId = Long.valueOf(authentication.getName());
+        UUID adminId = UUID.fromString(authentication.getName());
         return ResponseEntity.ok(userService.updateUserStatus(adminId, id, request.getStatus()));
     }
 }

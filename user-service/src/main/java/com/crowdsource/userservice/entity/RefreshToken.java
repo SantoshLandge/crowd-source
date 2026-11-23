@@ -1,5 +1,7 @@
 package com.crowdsource.userservice.entity;
 
+import java.util.UUID;
+import org.hibernate.annotations.UuidGenerator;
 import jakarta.persistence.*;
 import lombok.Getter;
 import lombok.NoArgsConstructor;
@@ -29,14 +31,15 @@ import java.util.HexFormat;
 public class RefreshToken {
 
     @Id
-    @GeneratedValue(strategy = GenerationType.IDENTITY)
-    private Long id;
+    @UuidGenerator(style = UuidGenerator.Style.VERSION_7)
+    @Column(updatable = false, nullable = false)
+    private UUID id;
 
     @Column(name = "token_hash", nullable = false, unique = true, length = 64)
     private String tokenHash;  // SHA256(opaque token)
 
     @Column(name = "user_id", nullable = false)
-    private Long userId;
+    private UUID userId;
 
     @Column(name = "expires_at", nullable = false)
     private LocalDateTime expiresAt;
@@ -47,7 +50,7 @@ public class RefreshToken {
     @Column(name = "created_at", nullable = false)
     private LocalDateTime createdAt = LocalDateTime.now();
 
-    public static RefreshToken create(String rawToken, Long userId, Duration ttl) {
+    public static RefreshToken create(String rawToken, UUID userId, Duration ttl) {
         RefreshToken token = new RefreshToken();
         token.tokenHash = hash(rawToken);
         token.userId = userId;
